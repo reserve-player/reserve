@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       Reading video is the only permission this app asks for. There is deliberately no
@@ -9,6 +11,16 @@
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+
+    <!--
+      media3-exoplayer's own manifest adds ACCESS_NETWORK_STATE so it can pick a bitrate for
+      streams. This app never streams, and a network permission in the merged manifest would
+      make the offline claim unverifiable, so it is merged back out. Media3 expects this:
+      NetworkTypeObserver catches the SecurityException and reports "network type unknown".
+    -->
+    <uses-permission
+        android:name="android.permission.ACCESS_NETWORK_STATE"
+        tools:node="remove" />
 
     <!-- Runs on a TV box and on a phone; neither a remote nor a touchscreen is required. -->
     <uses-feature
