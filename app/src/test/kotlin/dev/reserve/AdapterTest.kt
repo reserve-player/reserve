@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.test.core.app.ApplicationProvider
 import dev.reserve.logic.Reservation
+import dev.reserve.logic.ReserveQueue
 import dev.reserve.logic.VideoItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -90,7 +91,7 @@ class AdapterTest {
 
     @Test
     fun `a queue row is numbered from one and shows the title`() {
-        val adapter = ReservationListAdapter({ }, { }, { })
+        val adapter = ReservationListAdapter({ }, { }, { }, { })
         adapter.submit(
             listOf(
                 Reservation(100L, video(id = 1L, title = "First")),
@@ -110,10 +111,12 @@ class AdapterTest {
         var cancelled: Long? = null
         var movedUp: Long? = null
         var movedDown: Long? = null
+        var playNext: Long? = null
         val adapter = ReservationListAdapter(
             onCancel = { cancelled = it },
             onMoveUp = { movedUp = it },
             onMoveDown = { movedDown = it },
+            onPlayNext = { playNext = it },
         )
         adapter.submit(listOf(Reservation(77L, video())))
 
@@ -122,10 +125,36 @@ class AdapterTest {
         holder.itemView.findViewById<View>(R.id.reservationUp).performClick()
         holder.itemView.findViewById<View>(R.id.reservationDown).performClick()
         holder.itemView.findViewById<View>(R.id.reservationCancel).performClick()
+        holder.itemView.findViewById<View>(R.id.reservationPlayNext).performClick()
 
         assertEquals(77L, movedUp)
         assertEquals(77L, movedDown)
         assertEquals(77L, cancelled)
+        assertEquals(77L, playNext)
+    }
+
+    /**
+     * The queue owns the ordering, so this is the seam where a wrong wiring would hide: the
+     * button could fire and still call the wrong queue method. Pressing it on the third row must
+     * put exactly that reservation at the front.
+     */
+    @Test
+    fun `play next on a queued row moves that video to the front`() {
+        val queue = ReserveQueue()
+        queue.playNow(video(id = 1L, title = "Playing"))
+        queue.reserve(video(id = 2L, title = "First"))
+        queue.reserve(video(id = 3L, title = "Second"))
+        val third = queue.reserve(video(id = 4L, title = "Third"))
+
+        val adapter = ReservationListAdapter({ }, { }, { }, onPlayNext = { queue.bumpToNext(it) })
+        adapter.submit(queue.reservations)
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 2)
+        holder.itemView.findViewById<View>(R.id.reservationPlayNext).performClick()
+
+        assertEquals(third.id, queue.reservations.first().id)
+        assertEquals(listOf("Third", "First", "Second"), queue.reservations.map { it.video.title })
+        assertEquals("Playing", queue.nowPlaying?.video?.title)
     }
 
     private fun View.text(id: Int): String = findViewById<TextView>(id).text.toString()

@@ -13,6 +13,7 @@ class ReservationListAdapter(
     private val onCancel: (Long) -> Unit,
     private val onMoveUp: (Long) -> Unit,
     private val onMoveDown: (Long) -> Unit,
+    private val onPlayNext: (Long) -> Unit,
 ) : RecyclerView.Adapter<ReservationListAdapter.ViewHolder>() {
 
     private var items: List<Reservation> = emptyList()
@@ -30,7 +31,7 @@ class ReservationListAdapter(
         ViewHolder(ItemReservationBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position], position, onCancel, onMoveUp, onMoveDown)
+        holder.bind(items[position], position, onCancel, onMoveUp, onMoveDown, onPlayNext)
     }
 
     class ViewHolder(
@@ -43,12 +44,14 @@ class ReservationListAdapter(
             onCancel: (Long) -> Unit,
             onMoveUp: (Long) -> Unit,
             onMoveDown: (Long) -> Unit,
+            onPlayNext: (Long) -> Unit,
         ) {
             val context = binding.root.context
             binding.reservationPosition.text =
                 context.getString(R.string.queue_position, position + 1)
             binding.reservationTitle.text = reservation.video.title
             binding.reservationDuration.text = DurationFormat.format(reservation.video.durationMs)
+            binding.reservationPlayNext.setOnClickListener { onPlayNext(reservation.id) }
             binding.reservationUp.setOnClickListener { onMoveUp(reservation.id) }
             binding.reservationDown.setOnClickListener { onMoveDown(reservation.id) }
             binding.reservationCancel.setOnClickListener { onCancel(reservation.id) }

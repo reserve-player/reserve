@@ -63,6 +63,7 @@ class MainActivity : AppCompatActivity() {
             onCancel = { changeQueue { viewModel.queue.cancel(it) } },
             onMoveUp = { changeQueue { viewModel.queue.moveUp(it) } },
             onMoveDown = { changeQueue { viewModel.queue.moveDown(it) } },
+            onPlayNext = { changeQueue { viewModel.queue.bumpToNext(it) } },
         )
 
         binding.libraryList.layoutManager = LinearLayoutManager(this)
