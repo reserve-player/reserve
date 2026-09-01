@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      A player-first dark theme: this app is full screen video most of the time, and on a TV
+      a light surface behind a video is glare.
+    -->
+    <style name="Theme.Reserve" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorSecondary">@color/accent</item>
+        <item name="android:windowBackground">@color/player_background</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
+</resources>

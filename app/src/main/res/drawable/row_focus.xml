@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Focus has to be visible from across a room, so a focused row gets a filled highlight rather
+  than the thin default ripple. This is the whole D-pad affordance.
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@color/row_focused" />
+    <item android:state_pressed="true" android:drawable="@color/row_pressed" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

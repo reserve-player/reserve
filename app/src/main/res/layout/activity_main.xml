@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  The player fills the window and never moves. Every panel is drawn on top of it, which is
+  what lets you browse and reserve while the current video keeps playing.
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/player_background">
+
+    <androidx.media3.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/cd_player"
+        android:focusable="false"
+        app:resize_mode="fit"
+        app:surface_type="surface_view"
+        app:use_controller="false" />
+
+    <TextView
+        android:id="@+id/upNextBanner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="24dp"
+        android:background="@color/panel_background"
+        android:paddingLeft="16dp"
+        android:paddingTop="10dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="10dp"
+        android:textColor="@color/accent"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+    <!-- Reserve browser: search plus the whole library, as a side panel over the video. -->
+    <LinearLayout
+        android:id="@+id/browserPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/panel_scrim"
+        android:orientation="vertical"
+        android:paddingLeft="32dp"
+        android:paddingTop="24dp"
+        android:paddingRight="32dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/browse_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <androidx.appcompat.widget.AppCompatEditText
+            android:id="@+id/searchInput"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@color/panel_background"
+            android:hint="@string/search_hint"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:padding="14dp"
+            android:textColor="@color/text_primary"
+            android:textColorHint="@color/text_secondary"
+            android:textSize="18sp" />
+
+        <TextView
+            android:id="@+id/browserEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/library_empty"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/libraryList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:clipToPadding="false" />
+    </LinearLayout>
+
+    <!-- The reserved list: what is coming up, and the controls to change it. -->
+    <LinearLayout
+        android:id="@+id/queuePanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/panel_scrim"
+        android:orientation="vertical"
+        android:paddingLeft="32dp"
+        android:paddingTop="24dp"
+        android:paddingRight="32dp"
+        android:paddingBottom="24dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/queue_title"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/queueEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/queue_empty"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            android:visibility="gone" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/queueList"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="12dp"
+            android:layout_weight="1"
+            android:clipToPadding="false" />
+    </LinearLayout>
+
+    <!-- Permission prompt, empty library, and "nothing playing" all share this panel. -->
+    <LinearLayout
+        android:id="@+id/statusPanel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/player_background"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:padding="32dp">
+
+        <TextView
+            android:id="@+id/statusMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center"
+            android:text="@string/permission_needed"
+            android:textColor="@color/text_primary"
+            android:textSize="18sp" />
+
+        <Button
+            android:id="@+id/statusAction"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="@string/action_grant" />
+    </LinearLayout>
+
+</FrameLayout>

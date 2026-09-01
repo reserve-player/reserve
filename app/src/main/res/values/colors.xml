@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="player_background">#FF000000</color>
+    <color name="panel_background">#F21C1C1E</color>
+    <color name="panel_scrim">#99000000</color>
+    <color name="accent">#FFFFC043</color>
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#FFB0B0B5</color>
+    <color name="row_focused">#33FFC043</color>
+    <color name="row_pressed">#22FFFFFF</color>
+</resources>
