@@ -2,6 +2,8 @@ package dev.reserve
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
+import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
@@ -20,6 +22,9 @@ import org.robolectric.annotation.Config
  *
  * Android drops a `<uses-permission>` whose `maxSdkVersion` is below the running SDK, so the
  * storage permissions genuinely differ by version and have to be asserted per era.
+ *
+ * Where the app can be installed is a manifest promise too, so the Android TV declarations are
+ * checked here rather than left to be discovered by a user with a TV box.
  */
 @RunWith(RobolectricTestRunner::class)
 class ManifestTest {
@@ -79,8 +84,45 @@ class ManifestTest {
         )
     }
 
+    @Test
+    @Config(sdk = [33])
+    fun `the app is listed in the Android TV launcher`() {
+        val leanback = Intent(Intent.ACTION_MAIN).addCategory(LEANBACK_LAUNCHER)
+
+        val matches = context.packageManager.queryIntentActivities(leanback, 0)
+
+        assertTrue(
+            "Without a LEANBACK_LAUNCHER filter the app installs on a TV but never appears on " +
+                "its home screen. Resolved: ${matches.map { it.activityInfo?.name }}",
+            matches.any { it.activityInfo?.name == MainActivity::class.java.name },
+        )
+    }
+
+    @Test
+    @Config(sdk = [33])
+    fun `no hardware is demanded that would block install on a TV or on a phone`() {
+        val info = context.packageManager
+            .getPackageInfo(context.packageName, PackageManager.GET_CONFIGURATIONS)
+        val required = info.reqFeatures.orEmpty()
+            .filter { it.flags and FeatureInfo.FLAG_REQUIRED != 0 }
+            .mapNotNull { it.name }
+
+        // Touchscreen is required by DEFAULT unless declared otherwise, which is the usual reason
+        // a perfectly good player is not installable on a TV box.
+        assertEquals(
+            "Requiring hardware narrows where the app can be installed, and this app needs none " +
+                "of it: a TV has no touchscreen and a phone has no D-pad. Required: $required",
+            emptyList<String>(),
+            required.filter { it == TOUCHSCREEN || it == LEANBACK },
+        )
+    }
+
     private companion object {
         /** Substrings rather than a fixed list, so a permission nobody predicted still trips this. */
         val NETWORK_WORDS = listOf("INTERNET", "NETWORK", "WIFI", "BLUETOOTH", "NFC")
+
+        const val LEANBACK_LAUNCHER = "android.intent.category.LEANBACK_LAUNCHER"
+        const val TOUCHSCREEN = "android.hardware.touchscreen"
+        const val LEANBACK = "android.software.leanback"
     }
 }
