@@ -100,6 +100,20 @@ contributed zero — a test task that silently runs nothing cannot pass as green
 - The queue is not saved across a deliberate quit. Closing the app clears the party.
 - Only videos indexed by Android's MediaStore are visible — the same set your gallery shows.
 
+## How it was made
+
+This was built end to end in [Omniscio](https://omniscio.com), a desktop app for running and
+coordinating Claude Code sessions. Everything here — reading the original request, the design
+decisions, the code, the 92 tests, the CI pipeline, and this README — came out of a single
+agent-driven run.
+
+Worth stating plainly, since it explains the limits above: no human ever ran this on a phone or a
+TV box. The design was pushed through a review pass that caught real problems — a network
+permission ExoPlayer injects through manifest merging, a queue action that was implemented and
+tested but had no button, and a permission dialog that left users stranded after a second refusal
+— but a review pass is not the same as watching it play a video on a sofa. If you install it and
+something misbehaves, that is genuinely useful information and worth opening an issue about.
+
 ## Licence
 
 MIT. See [LICENSE](LICENSE).
