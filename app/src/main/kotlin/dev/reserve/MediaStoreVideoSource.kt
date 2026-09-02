@@ -2,10 +2,13 @@ package dev.reserve
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.Cursor
+import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
 import androidx.core.content.ContextCompat
 import dev.reserve.logic.VideoItem
 
@@ -22,6 +25,9 @@ object MediaStoreVideoSource {
 
     /** Granted on Android 14+ when the user shares only some videos instead of all of them. */
     private const val PERMISSION_PARTIAL = "android.permission.READ_MEDIA_VISUAL_USER_SELECTED"
+
+    private const val PREFS_ACCESS = "reserve_access"
+    private const val KEY_REQUESTED = "video_access_requested"
 
     private val BASE_PROJECTION = arrayOf(
         MediaStore.Video.Media._ID,
@@ -51,6 +57,32 @@ object MediaStoreVideoSource {
 
     fun canReadVideos(context: Context): Boolean =
         hasPermission(context) || hasPartialAccess(context)
+
+    /** Records that the system dialog has been shown at least once. */
+    fun markRequested(context: Context) {
+        prefs(context).edit().putBoolean(KEY_REQUESTED, true).apply()
+    }
+
+    fun wasRequested(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_REQUESTED, false)
+
+    /**
+     * True when the OS will no longer show the permission dialog, so the grant button would do
+     * nothing and the only way back in is the system settings screen.
+     *
+     * Android cannot report this directly: `shouldShowRequestPermissionRationale` is false both
+     * before the first ask and after a permanent denial. [wasRequested] is what separates the
+     * two, which is why the request is recorded when it is launched.
+     */
+    fun isPermanentlyDenied(context: Context, showRationale: Boolean): Boolean =
+        !canReadVideos(context) && wasRequested(context) && !showRationale
+
+    /** The system settings page for this app, where a denied permission can be granted again. */
+    fun appSettingsIntent(packageName: String): Intent =
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null),
+        )
 
     /** Blocking; call it off the main thread. */
     fun query(context: Context): List<VideoItem> {
@@ -105,6 +137,9 @@ object MediaStoreVideoSource {
 
     private fun isGranted(context: Context, permission: String): Boolean =
         ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+
+    private fun prefs(context: Context) =
+        context.getSharedPreferences(PREFS_ACCESS, Context.MODE_PRIVATE)
 
     private fun Cursor.stringOrNull(column: Int): String? =
         if (column < 0 || isNull(column)) null else getString(column)?.takeIf { it.isNotBlank() }

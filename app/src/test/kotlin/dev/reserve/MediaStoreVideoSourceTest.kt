@@ -1,14 +1,19 @@
 package dev.reserve
 
 import android.Manifest
+import android.content.Context
 import android.database.MatrixCursor
 import android.os.Build
 import android.provider.MediaStore
+import android.provider.Settings
+import androidx.test.core.app.ApplicationProvider
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 private const val BASE_URI = "content://media/external/video/media"
@@ -19,7 +24,53 @@ private const val COLUMN_DATA = "_data"
 @Config(sdk = [33])
 class MediaStoreVideoSourceTest {
 
+    private val context: Context = ApplicationProvider.getApplicationContext()
+
     private fun cursorWith(vararg columns: String) = MatrixCursor(arrayOf(*columns))
+
+    // ---- permanent denial -----------------------------------------------------------------
+    //
+    // Android reports `shouldShowRequestPermissionRationale = false` both BEFORE the first ask
+    // and AFTER a permanent denial, so these three cases are the whole reason the "already
+    // asked" flag exists. Getting them backwards either strands a first-time user in settings
+    // or leaves the dead button this was written to remove.
+
+    @Test
+    fun `access is not permanently denied before the dialog has ever been shown`() {
+        assertFalse(MediaStoreVideoSource.isPermanentlyDenied(context, showRationale = false))
+    }
+
+    @Test
+    fun `a soft denial is not permanent while the system still offers the dialog`() {
+        MediaStoreVideoSource.markRequested(context)
+
+        assertTrue(MediaStoreVideoSource.wasRequested(context))
+        assertFalse(MediaStoreVideoSource.isPermanentlyDenied(context, showRationale = true))
+    }
+
+    @Test
+    fun `access is permanently denied once asked and the system stops offering the dialog`() {
+        MediaStoreVideoSource.markRequested(context)
+
+        assertTrue(MediaStoreVideoSource.isPermanentlyDenied(context, showRationale = false))
+    }
+
+    @Test
+    fun `granted access is never reported as permanently denied`() {
+        MediaStoreVideoSource.markRequested(context)
+        shadowOf(ApplicationProvider.getApplicationContext<android.app.Application>())
+            .grantPermissions(Manifest.permission.READ_MEDIA_VIDEO)
+
+        assertFalse(MediaStoreVideoSource.isPermanentlyDenied(context, showRationale = false))
+    }
+
+    @Test
+    fun `the settings intent points at this app rather than the settings root`() {
+        val intent = MediaStoreVideoSource.appSettingsIntent("dev.reserve")
+
+        assertEquals(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, intent.action)
+        assertEquals("dev.reserve", intent.data?.schemeSpecificPart)
+    }
 
     private fun modernCursor() = cursorWith(
         MediaStore.Video.Media._ID,

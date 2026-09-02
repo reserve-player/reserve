@@ -12,6 +12,7 @@
     <string name="action_down">Down</string>
     <string name="action_grant">Allow access to videos</string>
     <string name="action_browse">Browse videos</string>
+    <string name="action_settings">Open settings</string>
 
     <string name="reserved_toast">Reserved: %1$s</string>
     <string name="up_next_banner">Up next: %1$s</string>

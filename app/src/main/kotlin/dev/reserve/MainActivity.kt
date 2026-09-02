@@ -9,6 +9,7 @@ import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.media3.common.util.UnstableApi
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -158,12 +159,26 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun onStatusAction() {
-        if (MediaStoreVideoSource.canReadVideos(this)) {
-            openBrowser()
-        } else {
-            requestPermission.launch(MediaStoreVideoSource.requiredPermission())
+        when {
+            MediaStoreVideoSource.canReadVideos(this) -> openBrowser()
+            // The dialog is gone for good, so asking again would be a button that does nothing.
+            isPermanentlyDenied() ->
+                startActivity(MediaStoreVideoSource.appSettingsIntent(packageName))
+
+            else -> {
+                MediaStoreVideoSource.markRequested(this)
+                requestPermission.launch(MediaStoreVideoSource.requiredPermission())
+            }
         }
     }
+
+    private fun isPermanentlyDenied(): Boolean = MediaStoreVideoSource.isPermanentlyDenied(
+        this,
+        ActivityCompat.shouldShowRequestPermissionRationale(
+            this,
+            MediaStoreVideoSource.requiredPermission(),
+        ),
+    )
 
     private fun onPermissionResult() {
         if (MediaStoreVideoSource.canReadVideos(this)) {
@@ -195,7 +210,10 @@ class MainActivity : AppCompatActivity() {
 
         binding.statusAction.visibility = View.VISIBLE
         when {
-            !MediaStoreVideoSource.canReadVideos(this) -> {
+            !MediaStoreVideoSource.canReadVideos(this) -> if (isPermanentlyDenied()) {
+                binding.statusMessage.setText(R.string.permission_denied)
+                binding.statusAction.setText(R.string.action_settings)
+            } else {
                 binding.statusMessage.setText(R.string.permission_needed)
                 binding.statusAction.setText(R.string.action_grant)
             }
@@ -248,6 +266,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- lifecycle ------------------------------------------------------------------------
+
+    /**
+     * Granting from the settings screen is the one way access can change with no result callback
+     * to catch it, so the state is re-read on the way back in.
+     */
+    override fun onResume() {
+        super.onResume()
+        if (MediaStoreVideoSource.canReadVideos(this) &&
+            viewModel.state.value == LibraryViewModel.LoadState.IDLE
+        ) {
+            viewModel.load()
+        }
+        render()
+    }
 
     override fun onStop() {
         super.onStop()
