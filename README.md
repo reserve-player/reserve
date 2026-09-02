@@ -1,0 +1,105 @@
+# Reserve
+
+A video player for Android that works like a karaoke machine. While something is playing, you
+search your device for another video and **reserve** it. It plays as soon as the current one
+ends. Reserve as many as you like, in any order, without ever interrupting what is on screen.
+
+Everything is local. The app plays videos already on your device and **declares no network
+permission at all**, so it cannot phone home even if it wanted to.
+
+## Why it exists
+
+Every player treats a playlist as something you build first and watch second. A karaoke machine
+works the other way round: the song is playing, and people queue up the next one while it does.
+This is that, for the videos already on your phone or TV box.
+
+## What it does
+
+- Plays videos from your device, full screen.
+- Opens a search overlay **over** the playing video — playback keeps running while you browse.
+- Reserving a video queues it; the queue plays out automatically, one video after another.
+- A "coming up" panel lets you remove a reservation, move it up or down, or bump it straight to
+  the front.
+- The same video can be reserved twice — each reservation is its own entry, like a real karaoke
+  queue.
+- Reserve while nothing is playing and it just starts.
+- A video that will not decode is skipped rather than dead-ending the session.
+- Works from a TV remote (D-pad, OK, Back, Menu, Play/Pause, Next) as well as by touch.
+- Keeps the screen awake while playing, ducks for phone calls, and pauses when headphones are
+  unplugged.
+- The queue survives rotation, and survives the app being killed in the background.
+
+## Requirements
+
+- Android 5.0 (API 21) or newer — phone, tablet, or an Android TV box.
+- Permission to read the videos on the device. Nothing else.
+
+## Installing
+
+There is no Play Store listing. Build the APK yourself, or take one from a CI run:
+
+```
+gradle :app:assembleDebug
+# app/build/outputs/apk/debug/app-debug.apk
+```
+
+There is deliberately **no `gradlew` wrapper committed**, so use your own `gradle` — the commands
+here are `gradle`, not `./gradlew`.
+
+The GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml) runs both
+test suites and produces the same APK as a downloadable artifact. If Actions is disabled on this
+repository, enable it and run the workflow, or just build locally with the command above.
+
+You need JDK 17, Gradle 8.10.2, and an Android SDK with platform 35 and build-tools 35.0.0.
+`minSdk` is 21, so the APK installs back to Android 5.0.
+
+## Using it from a remote
+
+| Key | What it does |
+|---|---|
+| **OK / Enter** | Opens the reserve browser (when no panel is open) |
+| **Menu** | Shows or hides the "coming up" queue |
+| **Back** | Closes the open panel; leaves the app when nothing is open |
+| **Play / Pause** | Toggles playback |
+| **Next** | Skips to the next reservation |
+
+Every button in every list is individually focusable, so the whole app is reachable with a D-pad.
+
+## How it is built
+
+Two modules, split so the interesting logic can be tested without a device:
+
+| Module | Holds |
+|---|---|
+| `logic/` | Pure Kotlin, no Android imports — the queue, the search ranking, and the rule for what plays next. |
+| `app/` | The Android shell — the player, the overlays, the device scan, the remote keys. |
+
+The queue is the single source of truth. The player is only ever handed **one** video at a time,
+so nothing has to stay in sync with a player-side playlist while the queue is being reordered
+mid-playback. Auto-advance lives in `logic/` behind a small `VideoSink` interface, which is why
+it can be proven correct with no phone attached.
+
+## Tests
+
+```
+gradle :logic:test :app:testDebugUnitTest
+```
+
+92 tests. The `logic/` suite runs on a plain JVM; the `app/` suite runs under Robolectric and
+includes a test that actually starts the activity, so a green build means the app launches rather
+than merely compiling. CI additionally counts the executed test cases and fails if either module
+contributed zero — a test task that silently runs nothing cannot pass as green.
+
+## Honest limits
+
+- **Nothing here has been run on real hardware.** Every claim above is backed by unit tests,
+  Robolectric, and a CI build. That covers this app's own code; it does not cover ExoPlayer
+  actually painting frames on your TV, or whether the focus highlights are legible from a sofa.
+- The reserve queue is remembered as a list of video ids. If a video disappears from the device
+  while the app is in the background, its reservation is dropped on the way back in.
+- The queue is not saved across a deliberate quit. Closing the app clears the party.
+- Only videos indexed by Android's MediaStore are visible — the same set your gallery shows.
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).
