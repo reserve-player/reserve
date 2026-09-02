@@ -21,12 +21,6 @@ class PlaybackCoordinator(
     private val onStateChanged: () -> Unit = {},
 ) {
 
-    /** Starts [video] right away, leaving any pending reservations queued behind it. */
-    fun playNow(video: VideoItem) {
-        sink.play(queue.playNow(video).video)
-        onStateChanged()
-    }
-
     /**
      * Reserves [video] for later. If nothing is playing the queue is idle, so it starts
      * immediately rather than waiting for an end event that will never arrive.

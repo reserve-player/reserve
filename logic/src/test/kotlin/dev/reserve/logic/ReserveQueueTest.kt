@@ -14,7 +14,6 @@ class ReserveQueueTest {
         val queue = ReserveQueue()
 
         assertTrue(queue.isEmpty())
-        assertEquals(0, queue.size)
         assertNull(queue.nowPlaying)
         assertEquals(emptyList<Reservation>(), queue.reservations)
     }
@@ -33,23 +32,13 @@ class ReserveQueueTest {
     @Test
     fun `reserving does not disturb what is currently playing`() {
         val queue = ReserveQueue()
-        queue.playNow(video(1))
+        queue.reserve(video(1))
+        queue.advance()
 
         queue.reserve(video(2))
 
         assertEquals(1L, queue.nowPlaying?.video?.id)
         assertEquals(listOf(2L), queue.reservations.map { it.video.id })
-    }
-
-    @Test
-    fun `reserveNext puts the video at the front of the queue`() {
-        val queue = ReserveQueue()
-        queue.reserve(video(1))
-        queue.reserve(video(2))
-
-        queue.reserveNext(video(3))
-
-        assertEquals(listOf(3L, 1L, 2L), queue.reservations.map { it.video.id })
     }
 
     @Test
@@ -61,7 +50,7 @@ class ReserveQueueTest {
         val second = queue.reserve(song)
 
         assertNotEquals(first.id, second.id)
-        assertEquals(2, queue.size)
+        assertEquals(2, queue.reservations.size)
 
         queue.cancel(first.id)
 
@@ -87,7 +76,7 @@ class ReserveQueueTest {
         queue.reserve(video(1))
 
         assertFalse(queue.cancel(9999L))
-        assertEquals(1, queue.size)
+        assertEquals(1, queue.reservations.size)
     }
 
     @Test
@@ -186,29 +175,6 @@ class ReserveQueueTest {
     }
 
     @Test
-    fun `playNow starts a video without consuming the queue`() {
-        val queue = ReserveQueue()
-        queue.reserve(video(1))
-
-        queue.playNow(video(42))
-
-        assertEquals(42L, queue.nowPlaying?.video?.id)
-        assertEquals(listOf(1L), queue.reservations.map { it.video.id })
-    }
-
-    @Test
-    fun `clear empties the queue and stops playback`() {
-        val queue = ReserveQueue()
-        queue.playNow(video(1))
-        queue.reserve(video(2))
-
-        queue.clear()
-
-        assertTrue(queue.isEmpty())
-        assertNull(queue.nowPlaying)
-    }
-
-    @Test
     fun `reservations is a snapshot that later mutation does not alter`() {
         val queue = ReserveQueue()
         queue.reserve(video(1))
@@ -217,6 +183,6 @@ class ReserveQueueTest {
         queue.reserve(video(2))
 
         assertEquals(1, snapshot.size)
-        assertEquals(2, queue.size)
+        assertEquals(2, queue.reservations.size)
     }
 }

@@ -26,21 +26,12 @@ class ReserveQueue {
     /** Everything waiting behind [nowPlaying], in play order. */
     val reservations: List<Reservation> get() = pending.toList()
 
-    val size: Int get() = pending.size
-
     fun isEmpty(): Boolean = pending.isEmpty()
 
     /** Adds [video] to the back of the queue. Never touches what is currently playing. */
     fun reserve(video: VideoItem): Reservation {
         val reservation = Reservation(nextId++, video)
         pending.add(reservation)
-        return reservation
-    }
-
-    /** Adds [video] at the front, so it plays as soon as the current video ends. */
-    fun reserveNext(video: VideoItem): Reservation {
-        val reservation = Reservation(nextId++, video)
-        pending.add(0, reservation)
         return reservation
     }
 
@@ -62,29 +53,12 @@ class ReserveQueue {
     fun moveDown(reservationId: Long): Boolean = swap(indexOf(reservationId), 1)
 
     /**
-     * Starts [video] immediately, bypassing the queue.
-     *
-     * Used when the user picks a video with nothing playing; the pending reservations are
-     * deliberately left alone so a running queue survives someone starting a different video.
-     */
-    fun playNow(video: VideoItem): Reservation {
-        val reservation = Reservation(nextId++, video)
-        nowPlaying = reservation
-        return reservation
-    }
-
-    /**
      * Promotes the head of the queue to [nowPlaying] and returns it, or null when the queue
      * is empty — in which case nothing is playing any more.
      */
     fun advance(): Reservation? {
         nowPlaying = if (pending.isEmpty()) null else pending.removeAt(0)
         return nowPlaying
-    }
-
-    fun clear() {
-        pending.clear()
-        nowPlaying = null
     }
 
     private fun indexOf(reservationId: Long): Int = pending.indexOfFirst { it.id == reservationId }

@@ -19,6 +19,10 @@ private class FakeVideoSink : VideoSink {
     }
 }
 
+/**
+ * Playback is started here with [PlaybackCoordinator.reserve] into an idle queue, which is the
+ * only way the app itself ever starts a video.
+ */
 class PlaybackCoordinatorTest {
 
     private val queue = ReserveQueue()
@@ -27,16 +31,8 @@ class PlaybackCoordinatorTest {
     private val coordinator = PlaybackCoordinator(queue, sink) { stateChanges++ }
 
     @Test
-    fun `playNow hands the video straight to the player`() {
-        coordinator.playNow(video(1))
-
-        assertEquals(listOf(1L), sink.played.map { it.id })
-        assertEquals(1L, queue.nowPlaying?.video?.id)
-    }
-
-    @Test
     fun `reserving while a video plays does not interrupt it`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
 
         coordinator.reserve(video(2))
         coordinator.reserve(video(3))
@@ -57,7 +53,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `the next reservation starts when the current video ends`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
 
         coordinator.onItemEnded()
@@ -68,7 +64,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `reservations play in the order they were made`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
         coordinator.reserve(video(3))
         coordinator.reserve(video(4))
@@ -82,7 +78,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `playback stops cleanly once the queue runs out`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
 
         coordinator.onItemEnded()
 
@@ -92,7 +88,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `a repeated end event cannot swallow a reservation`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
 
         coordinator.onItemEnded()
@@ -106,7 +102,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `a video that fails to play skips to the next reservation`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
 
         coordinator.onItemFailed()
@@ -117,7 +113,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `a failure with an empty queue stops instead of dead-ending`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
 
         coordinator.onItemFailed()
 
@@ -127,7 +123,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `several unplayable videos in a row are skipped until one works`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
         coordinator.reserve(video(3))
 
@@ -141,7 +137,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `skip moves to the next reservation on demand`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
 
         coordinator.skip()
@@ -160,7 +156,7 @@ class PlaybackCoordinatorTest {
     @Test
     fun `the same video reserved twice plays twice`() {
         val encore = video(7, title = "Bohemian Rhapsody")
-        coordinator.playNow(encore)
+        coordinator.reserve(encore)
         coordinator.reserve(encore)
 
         coordinator.onItemEnded()
@@ -170,7 +166,7 @@ class PlaybackCoordinatorTest {
 
     @Test
     fun `every change notifies the UI so the queue can redraw`() {
-        coordinator.playNow(video(1))
+        coordinator.reserve(video(1))
         coordinator.reserve(video(2))
         coordinator.onItemEnded()
 

@@ -141,7 +141,8 @@ class AdapterTest {
     @Test
     fun `play next on a queued row moves that video to the front`() {
         val queue = ReserveQueue()
-        queue.playNow(video(id = 1L, title = "Playing"))
+        queue.reserve(video(id = 1L, title = "Playing"))
+        queue.advance()
         queue.reserve(video(id = 2L, title = "First"))
         queue.reserve(video(id = 3L, title = "Second"))
         val third = queue.reserve(video(id = 4L, title = "Third"))
