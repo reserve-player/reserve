@@ -10,6 +10,12 @@
     android:layout_height="match_parent"
     android:background="@color/player_background">
 
+    <!--
+      The controller is the TOUCH affordance: tap the video for play/pause and seek.
+      focusable="false" is load-bearing and must stay - it keeps the D-pad off the player so
+      OK still reaches MainActivity.onKeyDown and opens the browser. A focusable controller
+      swallows DPAD_CENTER and kills the only way a remote reserves a video.
+    -->
     <androidx.media3.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
@@ -17,8 +23,24 @@
         android:contentDescription="@string/cd_player"
         android:focusable="false"
         app:resize_mode="fit"
+        app:show_timeout="4000"
         app:surface_type="surface_view"
-        app:use_controller="false" />
+        app:use_controller="true" />
+
+    <!-- Rides with the transport controls so touch users can reach the browser mid-video. -->
+    <Button
+        android:id="@+id/reserveAction"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:layout_margin="24dp"
+        android:background="@color/panel_background"
+        android:contentDescription="@string/action_reserve"
+        android:minHeight="48dp"
+        android:minWidth="48dp"
+        android:text="@string/action_reserve"
+        android:textColor="@color/accent"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/upNextBanner"

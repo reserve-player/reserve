@@ -6,6 +6,7 @@
     <string name="browse_title">Reserve a video</string>
     <string name="queue_title">Coming up</string>
 
+    <string name="action_reserve">Reserve</string>
     <string name="action_play_next">Play next</string>
     <string name="action_cancel">Remove</string>
     <string name="action_up">Up</string>

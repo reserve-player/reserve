@@ -33,6 +33,29 @@ class RemoteControlTest {
     private fun launch(): ActivityController<MainActivity> =
         Robolectric.buildActivity(MainActivity::class.java).setup()
 
+    /**
+     * The regression guard for the whole touch fix.
+     *
+     * Enabling the transport controls is what makes the app usable on a phone, but a FOCUSABLE
+     * PlayerView takes the D-pad and its controller swallows DPAD_CENTER - which would silently
+     * kill the only way a remote opens the browser. The controller is a touch affordance; the
+     * player must stay out of the focus order.
+     */
+    @Test
+    fun `the player never takes D-pad focus, so the controls cannot swallow OK`() {
+        val controller = launch()
+        val player = controller.get().findViewById<View>(R.id.playerView)
+
+        assertFalse("a focusable player would eat DPAD_CENTER and break OK", player.isFocusable)
+        assertTrue(
+            "OK must still reach the activity with the controls enabled",
+            controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.browserPanel))
+
+        controller.destroy()
+    }
+
     @Test
     fun `the OK key opens the browser so videos can be reserved without a touchscreen`() {
         val controller = launch()

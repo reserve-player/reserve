@@ -29,6 +29,9 @@ object MediaStoreVideoSource {
     private const val PREFS_ACCESS = "reserve_access"
     private const val KEY_REQUESTED = "video_access_requested"
 
+    /** `MediaStore.VOLUME_EXTERNAL` by value — the constant itself is API 29+. */
+    private const val VOLUME_EXTERNAL = "external"
+
     private val BASE_PROJECTION = arrayOf(
         MediaStore.Video.Media._ID,
         MediaStore.Video.Media.TITLE,
@@ -84,20 +87,74 @@ object MediaStoreVideoSource {
             Uri.fromParts("package", packageName, null),
         )
 
-    /** Blocking; call it off the main thread. */
-    fun query(context: Context): List<VideoItem> {
+    /**
+     * Blocking; call it off the main thread.
+     *
+     * Reads TWO collections and merges them. The video collection alone misses anything the
+     * system filed elsewhere — a downloaded file belongs to the downloads collection and simply
+     * is not in the video one, which is why videos in `Download/` were invisible while the same
+     * files worked once moved to `Movies/`.
+     */
+    fun query(context: Context): List<VideoItem> =
+        mergeById(queryVideoCollection(context), queryAllVideoFiles(context))
+
+    /**
+     * Merges the two collections, deduped by id, the video collection winning any clash.
+     *
+     * Split out from [query] for the same reason as [readCursor]: the rule is testable without a
+     * real content provider. Dedupe by id is exact rather than a heuristic — the video collection
+     * is a view over the files table, so one file carries one `_ID` in both.
+     */
+    internal fun mergeById(
+        fromVideo: List<VideoItem>,
+        fromFiles: List<VideoItem>,
+    ): List<VideoItem> {
+        if (fromFiles.isEmpty()) return fromVideo
+        // No Map.putIfAbsent here: it is an API 24 default method and minSdk is 21, so it would
+        // throw NoSuchMethodError on exactly the old TV boxes this fix is aimed at.
+        val merged = LinkedHashMap<Long, VideoItem>(fromVideo.size + fromFiles.size)
+        fromVideo.forEach { merged[it.id] = it }
+        fromFiles.forEach { if (!merged.containsKey(it.id)) merged[it.id] = it }
+        return merged.values.sortedBy { it.title.lowercase() }
+    }
+
+    private fun queryVideoCollection(context: Context): List<VideoItem> {
         val collection = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-        val folderColumn =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) COLUMN_BUCKET else COLUMN_DATA
         val cursor = context.contentResolver.query(
             collection,
-            BASE_PROJECTION + folderColumn,
+            BASE_PROJECTION + folderColumn(),
             null,
             null,
             "${MediaStore.Video.Media.TITLE} COLLATE NOCASE ASC",
         ) ?: return emptyList()
         return cursor.use { readCursor(it, collection.toString()) }
     }
+
+    /**
+     * Every file the system has classified as video, wherever it lives.
+     *
+     * Deliberately failure-isolated: this is a SUPPLEMENT to the video collection, so an OEM
+     * build that rejects the query must add nothing rather than take the whole scan down with
+     * it. Losing videos a user can see today would be worse than not finding new ones.
+     */
+    private fun queryAllVideoFiles(context: Context): List<VideoItem> = try {
+        val collection = MediaStore.Files.getContentUri(VOLUME_EXTERNAL)
+        val cursor = context.contentResolver.query(
+            collection,
+            BASE_PROJECTION + folderColumn(),
+            "${MediaStore.Files.FileColumns.MEDIA_TYPE} = ?",
+            arrayOf(MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO.toString()),
+            null,
+        )
+        cursor?.use { readCursor(it, collection.toString()) } ?: emptyList()
+    } catch (e: RuntimeException) {
+        // SecurityException / IllegalArgumentException / SQLiteException all land here.
+        emptyList()
+    }
+
+    /** The bucket column only became public API for video at API 29; below that derive it. */
+    private fun folderColumn(): String =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) COLUMN_BUCKET else COLUMN_DATA
 
     /**
      * Maps a MediaStore cursor to items. Split out from [query] so the mapping — including the

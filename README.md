@@ -101,13 +101,21 @@ contributed zero — a test task that silently runs nothing cannot pass as green
 
 ## Honest limits
 
-- **Nothing here has been run on real hardware.** Every claim above is backed by unit tests,
-  Robolectric, and a CI build. That covers this app's own code; it does not cover ExoPlayer
-  actually painting frames on your TV, or whether the focus highlights are legible from a sofa.
+- **It has now been run on real hardware — a phone and a Mi Box 3 — and the first pass found
+  three bugs.** Playback could not be restarted after backgrounding, touch users had no controls
+  at all, and videos outside `Movies/` were invisible. All three are fixed, but the point stands:
+  the automated tests here did not catch any of them, so treat "the tests pass" as a floor rather
+  than a guarantee.
+- Everything is still verified by unit tests, Robolectric and a CI build rather than by a
+  device sitting on a desk. That covers this app's own code; it does not cover ExoPlayer painting
+  frames on your particular TV, or whether the focus highlights read from a sofa.
 - The reserve queue is remembered as a list of video ids. If a video disappears from the device
   while the app is in the background, its reservation is dropped on the way back in.
-- The queue is not saved across a deliberate quit. Closing the app clears the party.
-- Only videos indexed by Android's MediaStore are visible — the same set your gallery shows.
+- Back backgrounds the app while something is playing or reserved, so the queue survives. The
+  queue is NOT saved across a deliberate quit — force-closing clears the party.
+- Only videos indexed by Android's MediaStore are visible. That now includes downloads, not just
+  `Movies/`, but a file the system has never scanned stays invisible — this app does not walk the
+  filesystem itself.
 
 ## How it was made
 

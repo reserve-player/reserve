@@ -12,6 +12,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.widget.doOnTextChanged
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
 import dev.reserve.databinding.ActivityMainBinding
 import dev.reserve.logic.PlaybackCoordinator
@@ -39,6 +40,9 @@ class MainActivity : AppCompatActivity() {
     private var panel = Panel.NONE
 
     private val hideBanner = Runnable { binding.upNextBanner.visibility = View.GONE }
+
+    /** Whether playback was actually running when the activity was last stopped. */
+    private var wasPlayingWhenStopped = false
 
     private val requestPermission = registerForActivityResult(
         ActivityResultContracts.RequestPermission(),
@@ -74,13 +78,27 @@ class MainActivity : AppCompatActivity() {
 
         binding.searchInput.doOnTextChanged { _, _, _, _ -> applyFilter() }
         binding.statusAction.setOnClickListener { onStatusAction() }
+        binding.reserveAction.setOnClickListener { openBrowser() }
+
+        // The Reserve button rides with the transport controls, so touch users can reach the
+        // browser mid-video without a permanent overlay sitting on the picture.
+        binding.playerView.setControllerVisibilityListener(
+            PlayerView.ControllerVisibilityListener { visibility ->
+                binding.reserveAction.visibility =
+                    if (visibility == View.VISIBLE && panel == Panel.NONE) View.VISIBLE else View.GONE
+            },
+        )
 
         onBackPressedDispatcher.addCallback(this) {
-            if (panel == Panel.NONE) {
-                isEnabled = false
-                onBackPressedDispatcher.onBackPressed()
-            } else {
-                closePanel()
+            when {
+                panel != Panel.NONE -> closePanel()
+                // Back must not end a running session: finishing releases the player AND clears
+                // the ViewModel, which is how the reserved queue was being lost.
+                isSessionLive() -> moveTaskToBack(true)
+                else -> {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                }
             }
         }
 
@@ -202,6 +220,8 @@ class MainActivity : AppCompatActivity() {
         binding.browserPanel.visibility = visibleIf(panel == Panel.BROWSER)
         binding.queuePanel.visibility = visibleIf(panel == Panel.QUEUE)
         binding.queueEmpty.visibility = visibleIf(viewModel.queue.isEmpty())
+        // A panel covers the video, so the Reserve button goes with it.
+        if (panel != Panel.NONE) binding.reserveAction.visibility = View.GONE
 
         val idle = viewModel.queue.nowPlaying == null
         val showStatus = idle && panel == Panel.NONE
@@ -267,6 +287,26 @@ class MainActivity : AppCompatActivity() {
 
     // ---- lifecycle ------------------------------------------------------------------------
 
+    /** True while there is something playing or something waiting to play. */
+    private fun isSessionLive(): Boolean =
+        viewModel.queue.nowPlaying != null || !viewModel.queue.isEmpty()
+
+    /**
+     * Restores playback that backgrounding interrupted.
+     *
+     * [onStop] pauses so the audio does not keep running behind another app; without this the
+     * pause was one-way and the video could never be restarted — the session was dead until a
+     * force-quit, which took the whole reserved queue with it.
+     */
+    override fun onStart() {
+        super.onStart()
+        // Only if it was actually running when we left: a video the user deliberately paused
+        // must stay paused rather than springing back to life. No queue check is needed —
+        // ExoVideoSink.stop() clears the flag, so an exhausted queue can never look "playing".
+        if (wasPlayingWhenStopped) sink.resume()
+        wasPlayingWhenStopped = false
+    }
+
     /**
      * Granting from the settings screen is the one way access can change with no result callback
      * to catch it, so the state is re-read on the way back in.
@@ -283,6 +323,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStop() {
         super.onStop()
+        wasPlayingWhenStopped = sink.isPlaying
         sink.pause()
     }
 

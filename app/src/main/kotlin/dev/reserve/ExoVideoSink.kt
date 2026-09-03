@@ -59,7 +59,18 @@ class ExoVideoSink(
     override fun stop() {
         player.stop()
         player.clearMediaItems()
+        // Stopped means playback is no longer wanted. Without this the flag stays true with no
+        // media loaded, and a later resume would try to restart an empty player.
+        player.playWhenReady = false
     }
+
+    /**
+     * Whether playback is currently wanted — the flag [pause] clears and [resume] restores.
+     *
+     * Read before backgrounding so a video the user had deliberately paused is not resurrected
+     * when they come back.
+     */
+    val isPlaying: Boolean get() = player.playWhenReady
 
     fun togglePlayPause() {
         player.playWhenReady = !player.playWhenReady
@@ -67,6 +78,10 @@ class ExoVideoSink(
 
     fun pause() {
         player.playWhenReady = false
+    }
+
+    fun resume() {
+        player.playWhenReady = true
     }
 
     fun release() {

@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.test.core.app.ApplicationProvider
+import dev.reserve.logic.VideoItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -27,6 +28,61 @@ class MediaStoreVideoSourceTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
 
     private fun cursorWith(vararg columns: String) = MatrixCursor(arrayOf(*columns))
+
+    // ---- the two-collection merge --------------------------------------------------------
+    //
+    // Videos in Download/ were invisible while the same files played fine once moved to
+    // Movies/, because the video collection simply does not contain a file the system filed
+    // under downloads. query() now reads both collections and merges. These cover the merge
+    // rule; only a device can confirm the live ContentResolver behaviour.
+
+    private fun item(id: Long, title: String, folder: String = "Movies") =
+        VideoItem(id, title, "content://video/$id", 1_000L, folder)
+
+    @Test
+    fun `a video only the files query returns is included in the merged library`() {
+        val fromVideo = listOf(item(1L, "In Movies"))
+        val fromFiles = listOf(item(1L, "In Movies"), item(2L, "In Downloads"))
+
+        val merged = MediaStoreVideoSource.mergeById(fromVideo, fromFiles)
+
+        assertEquals(listOf("In Downloads", "In Movies"), merged.map { it.title })
+    }
+
+    @Test
+    fun `a video in both collections appears exactly once`() {
+        val shared = item(7L, "Shared")
+
+        val merged = MediaStoreVideoSource.mergeById(listOf(shared), listOf(shared))
+
+        assertEquals(1, merged.size)
+        assertEquals(7L, merged.single().id)
+    }
+
+    /**
+     * The safety property that keeps this change from regressing on hardware nobody here can
+     * test: whatever the second query does, the merged result is never SMALLER than the video
+     * collection alone.
+     */
+    @Test
+    fun `the merged library is never smaller than the video collection alone`() {
+        val fromVideo = listOf(item(1L, "A"), item(2L, "B"), item(3L, "C"))
+
+        assertEquals(3, MediaStoreVideoSource.mergeById(fromVideo, emptyList()).size)
+        assertEquals(3, MediaStoreVideoSource.mergeById(fromVideo, fromVideo).size)
+        assertEquals(4, MediaStoreVideoSource.mergeById(fromVideo, listOf(item(9L, "D"))).size)
+    }
+
+    @Test
+    fun `the video collection wins a clash, so its title and folder are kept`() {
+        val fromVideo = listOf(item(5L, "Canonical", folder = "Movies"))
+        val fromFiles = listOf(item(5L, "Duplicate", folder = "Download"))
+
+        val merged = MediaStoreVideoSource.mergeById(fromVideo, fromFiles)
+
+        assertEquals("Canonical", merged.single().title)
+        assertEquals("Movies", merged.single().folder)
+    }
 
     // ---- permanent denial -----------------------------------------------------------------
     //
