@@ -36,7 +36,19 @@ This is that, for the videos already on your phone or TV box.
 
 ## Installing
 
-There is no Play Store listing. Build the APK yourself, or take one from a CI run:
+**Download [reserve-debug.apk](reserve-debug.apk)** and open it on the device. Android will ask
+you to allow installs from unknown sources — that prompt is normal for anything not from the Play
+Store. `minSdk` is 21, so it installs back to Android 5.0.
+
+Two honest things about that file:
+
+- **It is a debug build**, signed with Android's standard debug key (`CN=Android Debug`). It runs
+  exactly like a release build for everyday use, but it is not Play-Store signed, and you cannot
+  upgrade it in place from a differently-signed build later.
+- **It is a binary from the internet.** If you would rather not trust one, build your own from
+  this source with the command below — the result is the same app.
+
+### Building it yourself
 
 ```
 gradle :app:assembleDebug
@@ -44,14 +56,11 @@ gradle :app:assembleDebug
 ```
 
 There is deliberately **no `gradlew` wrapper committed**, so use your own `gradle` — the commands
-here are `gradle`, not `./gradlew`.
+here are `gradle`, not `./gradlew`. You need JDK 17, Gradle 8.10.2, and an Android SDK with
+platform 35 and build-tools 35.0.0.
 
-The GitHub Actions workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml) runs both
-test suites and produces the same APK as a downloadable artifact. If Actions is disabled on this
-repository, enable it and run the workflow, or just build locally with the command above.
-
-You need JDK 17, Gradle 8.10.2, and an Android SDK with platform 35 and build-tools 35.0.0.
-`minSdk` is 21, so the APK installs back to Android 5.0.
+The workflow at [.github/workflows/ci.yml](.github/workflows/ci.yml) runs both test suites and
+builds the same APK, if you would rather let CI do it.
 
 ## Using it from a remote
 
