@@ -147,7 +147,7 @@ object MediaStoreVideoSource {
             null,
         )
         cursor?.use { readCursor(it, collection.toString()) } ?: emptyList()
-    } catch (e: RuntimeException) {
+    } catch (_: RuntimeException) {
         // SecurityException / IllegalArgumentException / SQLiteException all land here.
         emptyList()
     }

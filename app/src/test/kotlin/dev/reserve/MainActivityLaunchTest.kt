@@ -19,6 +19,7 @@ import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.android.controller.ActivityController
+import org.robolectric.shadows.ShadowDialog
 import org.robolectric.annotation.Config
 
 /**
@@ -178,6 +179,28 @@ class MainActivityLaunchTest {
         val player = controller.get().findViewById<PlayerView>(R.id.playerView)
 
         assertTrue("without the controller a phone user cannot pause", player.useController)
+
+        controller.destroy()
+    }
+
+    /**
+     * Back asks first, and asking must not itself end the session — the dialog is the whole
+     * point, so a Back that backgrounds immediately would defeat it.
+     */
+    @Test
+    fun `back asks before backgrounding a live session`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        ViewModelProvider(activity)[LibraryViewModel::class.java].queue.reserve(video(1L))
+
+        activity.onBackPressedDispatcher.onBackPressed()
+
+        // ShadowDialog, not ShadowAlertDialog: the app uses AppCompat's AlertDialog, which is a
+        // different class from the framework one and is invisible to getLatestAlertDialog().
+        val dialog = ShadowDialog.getLatestDialog()
+        assertNotNull("Back must put the question up rather than acting on it", dialog)
+        assertTrue("and the question must actually be on screen", dialog.isShowing)
+        assertFalse("and it must not finish the activity", activity.isFinishing)
 
         controller.destroy()
     }

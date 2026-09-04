@@ -3,7 +3,9 @@ package dev.reserve
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import dev.reserve.logic.Reservation
 import dev.reserve.logic.ReserveQueue
@@ -156,6 +158,59 @@ class AdapterTest {
         assertEquals(third.id, queue.reservations.first().id)
         assertEquals(listOf("Third", "First", "Second"), queue.reservations.map { it.video.title })
         assertEquals("Playing", queue.nowPlaying?.video?.title)
+    }
+
+    // ---- the reserved dots ----------------------------------------------------------------
+    //
+    // OP's idea: one dot per time a video is already queued, so pressing a row is never in
+    // doubt. The count is passed in per submit rather than read per bind, so a long library
+    // does not pay for it on every scroll.
+
+    private fun dotsIn(holder: RecyclerView.ViewHolder): Int =
+        holder.itemView.findViewById<LinearLayout>(R.id.videoDots).childCount
+
+    @Test
+    fun `a video that is not reserved shows no dots at all`() {
+        val adapter = VideoListAdapter { }
+        adapter.submit(listOf(video(id = 1L)), counts = emptyMap())
+
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+
+        assertEquals(0, dotsIn(holder))
+        assertEquals(View.GONE, holder.itemView.findViewById<View>(R.id.videoDots).visibility)
+    }
+
+    @Test
+    fun `the dot count matches how many times the video is queued`() {
+        val adapter = VideoListAdapter { }
+        adapter.submit(listOf(video(id = 1L), video(id = 2L)), counts = mapOf(1L to 1, 2L to 3))
+
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+        assertEquals(1, dotsIn(holder))
+
+        adapter.onBindViewHolder(holder, 1)
+        assertEquals(3, dotsIn(holder))
+    }
+
+    /**
+     * The RecyclerView trap: a recycled row must not keep the previous video's dots. Binding a
+     * reserved row and then an unreserved one through the SAME holder is exactly what recycling
+     * does, and a naive implementation leaves the old dots behind.
+     */
+    @Test
+    fun `a recycled row does not keep the previous video's dots`() {
+        val adapter = VideoListAdapter { }
+        adapter.submit(listOf(video(id = 1L), video(id = 2L)), counts = mapOf(1L to 3))
+
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+        assertEquals(3, dotsIn(holder))
+
+        adapter.onBindViewHolder(holder, 1)
+
+        assertEquals("the unreserved video must show a clean row", 0, dotsIn(holder))
     }
 
     private fun View.text(id: Int): String = findViewById<TextView>(id).text.toString()
