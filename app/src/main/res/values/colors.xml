@@ -8,4 +8,6 @@
     <color name="text_secondary">#FFB0B0B5</color>
     <color name="row_focused">#33FFC043</color>
     <color name="row_pressed">#22FFFFFF</color>
+    <color name="controls_scrim">#B3000000</color>
+    <color name="hud_background">#B3000000</color>
 </resources>

@@ -61,6 +61,19 @@ class ReserveQueue {
         return nowPlaying
     }
 
+    /**
+     * Empties the queue, leaving whatever is playing alone.
+     *
+     * Deleted once as uncalled API; back because the clear-queue button is a real caller. Without
+     * it there is no way to end a party early short of force-quitting the app.
+     */
+    fun clear() {
+        pending.clear()
+    }
+
+    /** How many times [videoId] appears in the queue — one dot per reservation in the browser. */
+    fun countOf(videoId: Long): Int = pending.count { it.video.id == videoId }
+
     private fun indexOf(reservationId: Long): Int = pending.indexOfFirst { it.id == reservationId }
 
     private fun swap(index: Int, delta: Int): Boolean {

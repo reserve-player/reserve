@@ -82,17 +82,91 @@ class MainActivityLaunchTest {
     }
 
     /**
-     * A phone has no OK key, so without this button there is no way to reserve anything once a
-     * video is playing — the status panel that carries the browse button is hidden by then.
+     * A phone has no OK key, and OK/tap now summons the controls rather than the browser — so
+     * without these buttons a touch user would have no reliable way into either panel, which is
+     * exactly the gap the previous round had to fix. They live in the controls on purpose, so
+     * touch never depends on an edge-swipe gesture landing.
      */
     @Test
-    fun `the reserve button opens the browser, so a touch user can queue mid-video`() {
+    fun `the controls carry buttons into both panels, so touch never needs a gesture`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
 
-        activity.findViewById<View>(R.id.reserveAction).performClick()
-
+        activity.findViewById<View>(R.id.controlReserve).performClick()
         assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.browserPanel).visibility)
+
+        activity.findViewById<View>(R.id.controlQueue).performClick()
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.queuePanel).visibility)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.browserPanel).visibility)
+
+        controller.destroy()
+    }
+
+    @Test
+    fun `the skip button advances the queue rather than the player's own playlist`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val queue = ViewModelProvider(controller.get())[LibraryViewModel::class.java].queue
+        queue.reserve(video(1L))
+        queue.advance()
+        queue.reserve(video(2L))
+
+        controller.get().findViewById<View>(R.id.controlSkip).performClick()
+
+        assertEquals("skip must promote the next reservation", 2L, queue.nowPlaying?.video?.id)
+
+        controller.destroy()
+    }
+
+    // ---- the persistent HUD OP asked for -------------------------------------------------
+
+    @Test
+    fun `the badge counts the queue and hides when there is nothing reserved`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val badge = activity.findViewById<TextView>(R.id.resBadge)
+        assertEquals("an empty queue should not clutter the picture", View.GONE, badge.visibility)
+
+        val queue = ViewModelProvider(activity)[LibraryViewModel::class.java].queue
+        queue.reserve(video(1L))
+        queue.reserve(video(2L))
+        activity.findViewById<View>(R.id.controlQueue).performClick()
+
+        assertEquals(View.VISIBLE, badge.visibility)
+        assertEquals("Res. 2", badge.text.toString())
+
+        controller.destroy()
+    }
+
+    @Test
+    fun `the UI button hides the badge and the up-next line together`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        ViewModelProvider(activity)[LibraryViewModel::class.java].queue.reserve(video(1L))
+        activity.findViewById<View>(R.id.controlQueue).performClick()
+        assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.resBadge).visibility)
+
+        activity.findViewById<View>(R.id.controlToggleHud).performClick()
+
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.resBadge).visibility)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.upNext).visibility)
+
+        controller.destroy()
+    }
+
+    /**
+     * Clearing a party's queue cannot be undone, so the button must do nothing on its own.
+     */
+    @Test
+    fun `the clear button does not empty the queue until it is confirmed`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val queue = ViewModelProvider(activity)[LibraryViewModel::class.java].queue
+        queue.reserve(video(1L))
+        queue.reserve(video(2L))
+
+        activity.findViewById<View>(R.id.controlClear).performClick()
+
+        assertEquals("the queue must survive until the user says yes", 2, queue.reservations.size)
 
         controller.destroy()
     }

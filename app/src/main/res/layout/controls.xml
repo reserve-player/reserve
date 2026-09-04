@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Custom transport controls.
+
+  The @id/exo_* ids ARE the contract with Media3 - PlayerControlView finds these by id and wires
+  play/pause, the seek bar and the time readouts itself, so none of that is reimplemented here.
+  Everything with a dev-reserve id is ours, because it acts on the QUEUE rather than the player:
+  Media3's own next/prev are permanently inert in this app (the player only ever holds one item
+  by design), which is why OP saw the Next button looking deliberately disabled.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/controls_scrim"
+    android:orientation="vertical">
+
+    <!-- Transport row, centred over the video. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:gravity="center"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@id/exo_rew"
+            style="@style/ReserveControlButton"
+            android:contentDescription="@string/action_up"
+            android:src="@drawable/ic_rewind" />
+
+        <ImageButton
+            android:id="@id/exo_play_pause"
+            style="@style/ReserveControlButton"
+            android:layout_marginLeft="16dp"
+            android:layout_marginRight="16dp"
+            android:contentDescription="@string/cd_player" />
+
+        <ImageButton
+            android:id="@id/exo_ffwd"
+            style="@style/ReserveControlButton"
+            android:contentDescription="@string/action_down"
+            android:src="@drawable/ic_forward" />
+
+        <!-- Ours, not Media3's: advances the QUEUE, which the player knows nothing about. -->
+        <ImageButton
+            android:id="@+id/controlSkip"
+            style="@style/ReserveControlButton"
+            android:layout_marginLeft="16dp"
+            android:contentDescription="@string/action_skip"
+            android:src="@drawable/ic_skip" />
+    </LinearLayout>
+
+    <!-- Seek row: Media3 drives the bar and both timestamps. -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="12dp">
+
+        <TextView
+            android:id="@id/exo_position"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_primary"
+            android:textSize="14sp" />
+
+        <androidx.media3.ui.DefaultTimeBar
+            android:id="@id/exo_progress"
+            android:layout_width="0dp"
+            android:layout_height="26dp"
+            android:layout_marginLeft="12dp"
+            android:layout_marginRight="12dp"
+            android:layout_weight="1" />
+
+        <TextView
+            android:id="@id/exo_duration"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="@color/text_secondary"
+            android:textSize="14sp" />
+    </LinearLayout>
+
+    <!--
+      Our own row. The queue and reserve buttons are here on purpose: OK/tap now shows these
+      controls rather than the browser, so without a button here a touch user would have no
+      reliable way into either panel - the exact gap the previous round had to fix.
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingLeft="16dp"
+        android:paddingRight="16dp"
+        android:paddingBottom="16dp">
+
+        <Button
+            android:id="@+id/controlQueue"
+            style="@style/ReserveControlText"
+            android:text="@string/action_queue" />
+
+        <Button
+            android:id="@+id/controlReserve"
+            style="@style/ReserveControlText"
+            android:layout_marginLeft="8dp"
+            android:text="@string/action_reserve" />
+
+        <View
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <Button
+            android:id="@+id/controlToggleHud"
+            style="@style/ReserveControlText"
+            android:text="@string/action_ui" />
+
+        <Button
+            android:id="@+id/controlClear"
+            style="@style/ReserveControlText"
+            android:layout_marginLeft="8dp"
+            android:text="@string/action_clear"
+            android:textColor="@color/accent" />
+    </LinearLayout>
+</LinearLayout>

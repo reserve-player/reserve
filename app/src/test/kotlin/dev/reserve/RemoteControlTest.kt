@@ -34,50 +34,136 @@ class RemoteControlTest {
         Robolectric.buildActivity(MainActivity::class.java).setup()
 
     /**
-     * The regression guard for the whole touch fix.
+     * The player must stay OUT of the focus order so keys reach the activity at all.
      *
-     * Enabling the transport controls is what makes the app usable on a phone, but a FOCUSABLE
-     * PlayerView takes the D-pad and its controller swallows DPAD_CENTER - which would silently
-     * kill the only way a remote opens the browser. The controller is a touch affordance; the
-     * player must stay out of the focus order.
+     * Its controls are focusable CHILDREN, which the parent's flag never blocked - the earlier
+     * belief that focusability had to be toggled to let a remote drive them was simply wrong,
+     * and this test pins the real arrangement.
      */
     @Test
-    fun `the player never takes D-pad focus, so the controls cannot swallow OK`() {
+    fun `the player never takes D-pad focus, so keys still reach the activity`() {
         val controller = launch()
         val player = controller.get().findViewById<View>(R.id.playerView)
 
-        assertFalse("a focusable player would eat DPAD_CENTER and break OK", player.isFocusable)
+        assertFalse("a focusable player would eat DPAD_CENTER", player.isFocusable)
         assertTrue(
-            "OK must still reach the activity with the controls enabled",
+            "OK must reach the activity so it can summon the controls",
             controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
         )
-        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.browserPanel))
 
         controller.destroy()
     }
 
+    /**
+     * OP's actual complaint: on a TV the transport controls could not be summoned AT ALL. The
+     * app never called showController(), so the only way in was minimising and reopening, which
+     * re-rendered the view. OK is now the way in, matching a screen tap on mobile.
+     */
     @Test
-    fun `the OK key opens the browser so videos can be reserved without a touchscreen`() {
+    fun `the OK key summons the transport controls a remote could not otherwise reach`() {
         val controller = launch()
 
         val handled = controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
 
-        assertTrue("OK must open the browser on a device with no touchscreen", handled)
-        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.browserPanel))
+        assertTrue("OK must be claimed while the controls are hidden", handled)
+        // Asserted as a HANDOVER rather than by reading isControllerFullyVisible: that flag stays
+        // false while the show animation runs, which never completes without a real frame, so it
+        // answers "is the animation done" rather than "who owns the keys now".
+        assertFalse(
+            "having shown the controls, the activity must hand OK over to them",
+            controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+
+        controller.destroy()
+    }
+
+    /**
+     * The rule that stops the activity and the controls fighting, which has caused a shipped bug
+     * in each of the last two rounds: while the controls are showing they own the keys, so the
+     * activity must NOT claim OK, LEFT or RIGHT and steal them from a focused button.
+     */
+    @Test
+    fun `while the controls are showing the activity claims no D-pad keys`() {
+        val controller = launch()
+        controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
+
+        listOf(
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+        ).forEach { keyCode ->
+            assertFalse(
+                "Claiming ${KeyEvent.keyCodeToString(keyCode)} here makes the controls undriveable",
+                controller.press(keyCode),
+            )
+        }
+        assertEquals(
+            "no panel should have opened behind the controls",
+            View.GONE,
+            controller.visibilityOf(R.id.queuePanel),
+        )
+
+        controller.destroy()
+    }
+
+    /**
+     * OP asked for the same key to open AND close each panel. The second press is the part that
+     * broke first time round: gating LEFT/RIGHT on "no panel is open" let the panel open and then
+     * left no way to close it with the key that opened it.
+     */
+    @Test
+    fun `left opens the queue and left again closes it`() {
+        val controller = launch()
+
+        assertTrue(controller.press(KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.queuePanel))
+
+        assertTrue("the key that opened it must also close it", controller.press(KeyEvent.KEYCODE_DPAD_LEFT))
+        assertEquals(View.GONE, controller.visibilityOf(R.id.queuePanel))
 
         controller.destroy()
     }
 
     @Test
-    fun `once the browser is open OK belongs to the focused row, not the activity`() {
+    fun `right opens the reserve panel and right again closes it`() {
         val controller = launch()
-        controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
 
-        val handledAgain = controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertTrue(controller.press(KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.browserPanel))
+
+        assertTrue("the key that opened it must also close it", controller.press(KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(View.GONE, controller.visibilityOf(R.id.browserPanel))
+
+        controller.destroy()
+    }
+
+    /**
+     * The opposite key must NOT be claimed while a panel is open — inside a list, left/right
+     * belong to the list, and swallowing them would strand a remote user in the panel.
+     */
+    @Test
+    fun `the opposite key is left alone while a panel is open`() {
+        val controller = launch()
+        controller.press(KeyEvent.KEYCODE_DPAD_LEFT)
+
+        assertFalse(controller.press(KeyEvent.KEYCODE_DPAD_RIGHT))
+        assertEquals(
+            "the queue must still be open — RIGHT was not ours to act on",
+            View.VISIBLE,
+            controller.visibilityOf(R.id.queuePanel),
+        )
+
+        controller.destroy()
+    }
+
+    @Test
+    fun `with a panel open the activity stops claiming OK, so rows stay selectable`() {
+        val controller = launch()
+        controller.press(KeyEvent.KEYCODE_DPAD_RIGHT)
 
         assertFalse(
             "Swallowing OK here would make every row in the library unselectable by remote",
-            handledAgain,
+            controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
         )
 
         controller.destroy()
@@ -99,7 +185,7 @@ class RemoteControlTest {
     @Test
     fun `back closes an open panel instead of quitting mid-session`() {
         val controller = launch()
-        controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        controller.press(KeyEvent.KEYCODE_DPAD_RIGHT)
 
         controller.get().onBackPressedDispatcher.onBackPressed()
 

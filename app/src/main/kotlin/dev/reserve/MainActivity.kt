@@ -8,6 +8,7 @@ import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.widget.doOnTextChanged
@@ -20,10 +21,16 @@ import dev.reserve.logic.VideoItem
 import dev.reserve.logic.VideoSearch
 
 /**
- * The whole app: a full-screen player with two panels drawn over it.
+ * The whole app: a full-screen player with two side sheets drawn over it.
  *
- * The panels are overlays rather than separate screens precisely because the point of the app
- * is that browsing and reserving never interrupt whatever is on screen.
+ * The sheets are overlays rather than separate screens precisely because the point of the app is
+ * that browsing and reserving never interrupt whatever is on screen.
+ *
+ * **The one rule for keys**, which has caused a bug in each of the last two rounds: this activity
+ * handles a key ONLY while the transport controls are hidden. `OK` shows the controls; the
+ * controls then own the keys until they hide again. `PlayerView` stays non-focusable so keys reach
+ * [onKeyDown] at all, and the controls' own buttons are focusable CHILDREN, so a remote can still
+ * drive them — the parent's flag never blocked that.
  */
 @UnstableApi
 class MainActivity : AppCompatActivity() {
@@ -39,7 +46,17 @@ class MainActivity : AppCompatActivity() {
     private val libraryAdapter = VideoListAdapter(::reserve)
     private var panel = Panel.NONE
 
-    private val hideBanner = Runnable { binding.upNextBanner.visibility = View.GONE }
+    /** Whether the Res badge and Up Next line are shown — toggled by the UI button. */
+    private var hudVisible = true
+
+    /**
+     * Whether the transport controls are on screen, tracked from the visibility callback.
+     *
+     * Deliberately NOT read from `isControllerFullyVisible`: that reports false while the show
+     * animation is still running, so it is not a reliable answer to "who owns the keys right
+     * now" — the callback is.
+     */
+    private var controlsShowing = false
 
     /** Whether playback was actually running when the activity was last stopped. */
     private var wasPlayingWhenStopped = false
@@ -78,14 +95,15 @@ class MainActivity : AppCompatActivity() {
 
         binding.searchInput.doOnTextChanged { _, _, _, _ -> applyFilter() }
         binding.statusAction.setOnClickListener { onStatusAction() }
-        binding.reserveAction.setOnClickListener { openBrowser() }
 
-        // The Reserve button rides with the transport controls, so touch users can reach the
-        // browser mid-video without a permanent overlay sitting on the picture.
+        wireControls()
+
+        // When the controls hide, focus may still sit on one of their buttons — now invisible.
+        // Returning it to the root is what stops OK being stranded and never working again.
         binding.playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility ->
-                binding.reserveAction.visibility =
-                    if (visibility == View.VISIBLE && panel == Panel.NONE) View.VISIBLE else View.GONE
+                controlsShowing = visibility == View.VISIBLE
+                if (!controlsShowing) binding.root.requestFocus()
             },
         )
 
@@ -94,7 +112,7 @@ class MainActivity : AppCompatActivity() {
                 panel != Panel.NONE -> closePanel()
                 // Back must not end a running session: finishing releases the player AND clears
                 // the ViewModel, which is how the reserved queue was being lost.
-                isSessionLive() -> moveTaskToBack(true)
+                isSessionLive() -> confirmExit()
                 else -> {
                     isEnabled = false
                     onBackPressedDispatcher.onBackPressed()
@@ -109,6 +127,20 @@ class MainActivity : AppCompatActivity() {
             viewModel.load()
         }
         render()
+    }
+
+    /** The controls live in `controls.xml`; these are the buttons that act on the QUEUE. */
+    private fun wireControls() {
+        val controls = binding.playerView
+        controls.findViewById<View>(R.id.controlSkip)?.setOnClickListener { coordinator.skip() }
+        controls.findViewById<View>(R.id.controlQueue)?.setOnClickListener { showPanel(Panel.QUEUE) }
+        controls.findViewById<View>(R.id.controlReserve)
+            ?.setOnClickListener { showPanel(Panel.BROWSER) }
+        controls.findViewById<View>(R.id.controlToggleHud)?.setOnClickListener {
+            hudVisible = !hudVisible
+            render()
+        }
+        controls.findViewById<View>(R.id.controlClear)?.setOnClickListener { confirmClearQueue() }
     }
 
     // ---- queue ----------------------------------------------------------------------------
@@ -128,7 +160,7 @@ class MainActivity : AppCompatActivity() {
     private fun onQueueChanged() {
         viewModel.rememberPendingReservations()
         queueAdapter.submit(viewModel.queue.reservations)
-        showUpNext()
+        applyFilter()
         render()
     }
 
@@ -143,42 +175,53 @@ class MainActivity : AppCompatActivity() {
         coordinator.onItemFailed()
     }
 
-    private fun showUpNext() {
-        val next = viewModel.queue.reservations.firstOrNull()
-        if (next == null || viewModel.queue.nowPlaying == null) {
-            binding.upNextBanner.visibility = View.GONE
-            return
-        }
-        binding.upNextBanner.text = getString(R.string.up_next_banner, next.video.title)
-        binding.upNextBanner.visibility = View.VISIBLE
-        binding.upNextBanner.removeCallbacks(hideBanner)
-        binding.upNextBanner.postDelayed(hideBanner, UP_NEXT_MS)
+    /** Clearing a party's queue is destructive and cannot be undone, so it is confirmed. */
+    private fun confirmClearQueue() {
+        val count = viewModel.queue.reservations.size
+        if (count == 0) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_clear_title)
+            .setMessage(getString(R.string.confirm_clear_message, count))
+            .setNegativeButton(R.string.action_cancel_dialog, null)
+            .setPositiveButton(R.string.confirm_clear_yes) { _, _ ->
+                changeQueue { viewModel.queue.clear() }
+            }
+            .show()
+    }
+
+    private fun confirmExit() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.confirm_exit_title)
+            .setMessage(R.string.confirm_exit_message)
+            .setNegativeButton(R.string.action_cancel_dialog, null)
+            .setPositiveButton(R.string.confirm_exit_yes) { _, _ -> moveTaskToBack(true) }
+            .show()
     }
 
     // ---- panels ---------------------------------------------------------------------------
 
-    private fun openBrowser() {
-        panel = Panel.BROWSER
+    private fun showPanel(target: Panel) {
+        panel = target
         render()
-        // Focus the list, not the search box: on a TV, focusing the field pops the keyboard
-        // over the video before the user has asked to type anything.
-        binding.libraryList.requestFocus()
+        // Focus the list, not the search box: on a TV, focusing the field pops the keyboard over
+        // the video before the user has asked to type anything.
+        if (target == Panel.BROWSER) binding.libraryList.requestFocus()
+        if (target == Panel.QUEUE) binding.queueList.requestFocus()
     }
 
-    private fun toggleQueuePanel() {
-        panel = if (panel == Panel.QUEUE) Panel.NONE else Panel.QUEUE
-        render()
-        if (panel == Panel.QUEUE) binding.queueList.requestFocus()
+    private fun togglePanel(target: Panel) {
+        if (panel == target) closePanel() else showPanel(target)
     }
 
     private fun closePanel() {
         panel = Panel.NONE
         render()
+        binding.root.requestFocus()
     }
 
     private fun onStatusAction() {
         when {
-            MediaStoreVideoSource.canReadVideos(this) -> openBrowser()
+            MediaStoreVideoSource.canReadVideos(this) -> showPanel(Panel.BROWSER)
             // The dialog is gone for good, so asking again would be a button that does nothing.
             isPermanentlyDenied() ->
                 startActivity(MediaStoreVideoSource.appSettingsIntent(packageName))
@@ -211,8 +254,9 @@ class MainActivity : AppCompatActivity() {
     private fun applyFilter() {
         val query = binding.searchInput.text?.toString().orEmpty()
         val results = VideoSearch.search(viewModel.library.value.orEmpty(), query)
-        libraryAdapter.submit(results)
-        binding.browserEmpty.visibility = if (results.isEmpty()) View.VISIBLE else View.GONE
+        // Counted once per submit rather than per row bind, so a long library stays cheap.
+        libraryAdapter.submit(results, results.associate { it.id to viewModel.queue.countOf(it.id) })
+        binding.browserEmpty.visibility = visibleIf(results.isEmpty())
     }
 
     /** Single place that decides what is on screen, so no two paths can disagree. */
@@ -220,8 +264,7 @@ class MainActivity : AppCompatActivity() {
         binding.browserPanel.visibility = visibleIf(panel == Panel.BROWSER)
         binding.queuePanel.visibility = visibleIf(panel == Panel.QUEUE)
         binding.queueEmpty.visibility = visibleIf(viewModel.queue.isEmpty())
-        // A panel covers the video, so the Reserve button goes with it.
-        if (panel != Panel.NONE) binding.reserveAction.visibility = View.GONE
+        renderHud()
 
         val idle = viewModel.queue.nowPlaying == null
         val showStatus = idle && panel == Panel.NONE
@@ -250,10 +293,40 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * The always-on state: how many are queued, and what plays next.
+     *
+     * Persistent rather than a timed banner — the old one showed the next title for four seconds
+     * as a video started, which is exactly when nobody is looking.
+     */
+    private fun renderHud() {
+        val queued = viewModel.queue.reservations
+        val next = queued.firstOrNull()
+        binding.resBadge.text = getString(R.string.res_badge, queued.size)
+        binding.resBadge.visibility = visibleIf(hudVisible && queued.isNotEmpty())
+
+        binding.upNext.text = next?.let { getString(R.string.up_next_short, shorten(it.video.title)) }
+        binding.upNext.visibility =
+            visibleIf(hudVisible && next != null && viewModel.queue.nowPlaying != null)
+    }
+
+    /** Enough of the title to recognise it, not enough to compete with the video. */
+    private fun shorten(title: String): String {
+        val words = title.split(" ").filter { it.isNotEmpty() }
+        if (words.size <= TITLE_WORDS) return title
+        return words.take(TITLE_WORDS).joinToString(" ") + "…"
+    }
+
     private fun visibleIf(condition: Boolean): Int = if (condition) View.VISIBLE else View.GONE
 
     // ---- remote control -------------------------------------------------------------------
 
+    /**
+     * The controls own the keys while they are showing; this activity owns them the rest of the
+     * time. Without that rule the two fight: either the controls swallow OK and the browser
+     * becomes unreachable by remote, or the activity swallows the D-pad and the controls cannot
+     * be driven. Both have shipped as bugs.
+     */
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         when (keyCode) {
             KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE,
@@ -270,15 +343,29 @@ class MainActivity : AppCompatActivity() {
             }
 
             KeyEvent.KEYCODE_MENU -> {
-                toggleQueuePanel()
+                togglePanel(Panel.QUEUE)
                 return true
             }
 
-            // Only claim OK when no panel is open, or it would steal presses from the lists.
+            // LEFT toggles the queue, so it must still be claimed WHILE the queue is open —
+            // otherwise the panel opens and can never be closed the same way it was opened.
+            KeyEvent.KEYCODE_DPAD_LEFT -> if (!controlsShowing && panel != Panel.BROWSER) {
+                togglePanel(Panel.QUEUE)
+                return true
+            }
+
+            KeyEvent.KEYCODE_DPAD_RIGHT -> if (!controlsShowing && panel != Panel.QUEUE) {
+                togglePanel(Panel.BROWSER)
+                return true
+            }
+
+            // OK summons the controls — the thing a remote previously had no way to do at all.
+            // Unlike LEFT/RIGHT it is NOT claimed while a panel is open, or every row in the
+            // lists would become unselectable by remote.
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
-            -> if (panel == Panel.NONE) {
-                openBrowser()
+            -> if (!controlsShowing && panel == Panel.NONE) {
+                binding.playerView.showController()
                 return true
             }
         }
@@ -300,8 +387,8 @@ class MainActivity : AppCompatActivity() {
      */
     override fun onStart() {
         super.onStart()
-        // Only if it was actually running when we left: a video the user deliberately paused
-        // must stay paused rather than springing back to life. No queue check is needed —
+        // Only if it was actually running when we left: a video the user deliberately paused must
+        // stay paused rather than springing back to life. No queue check is needed —
         // ExoVideoSink.stop() clears the flag, so an exhausted queue can never look "playing".
         if (wasPlayingWhenStopped) sink.resume()
         wasPlayingWhenStopped = false
@@ -329,12 +416,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        binding.upNextBanner.removeCallbacks(hideBanner)
         binding.playerView.player = null
         sink.release()
     }
 
     private companion object {
-        const val UP_NEXT_MS = 4_000L
+        const val TITLE_WORDS = 3
     }
 }

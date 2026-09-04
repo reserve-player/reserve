@@ -27,4 +27,22 @@
     <string name="partial_access">Some videos are hidden because only a few were shared. Tap to allow all.</string>
 
     <string name="cd_player">Video player</string>
+
+    <string name="res_badge">Res. %1$d</string>
+    <string name="up_next_short">Up Next: \"%1$s\"</string>
+    <string name="action_skip">Skip</string>
+    <string name="action_queue">Queue</string>
+    <string name="action_ui">UI</string>
+    <string name="action_clear">Clear</string>
+    <string name="cd_reserved_count">Reserved %1$d times</string>
+
+    <string name="confirm_clear_title">Clear your reserved list?</string>
+    <string name="confirm_clear_message">All %1$d reserved videos will be removed. The video playing now keeps playing.</string>
+    <string name="confirm_clear_yes">Clear</string>
+
+    <string name="confirm_exit_title">Are you sure you want to exit?</string>
+    <string name="confirm_exit_message">Reserve stays open in the background so your queue survives. Reopen it to carry on.</string>
+    <string name="confirm_exit_yes">Exit</string>
+
+    <string name="action_cancel_dialog">Cancel</string>
 </resources>

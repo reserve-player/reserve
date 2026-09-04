@@ -66,13 +66,31 @@ builds the same APK, if you would rather let CI do it.
 
 | Key | What it does |
 |---|---|
-| **OK / Enter** | Opens the reserve browser (when no panel is open) |
-| **Menu** | Shows or hides the "coming up" queue |
-| **Back** | Closes the open panel; leaves the app when nothing is open |
+| **OK / Enter** | Shows the transport controls — the same thing a screen tap does on a phone |
+| **Left** | Opens the "coming up" queue; press again to close it |
+| **Right** | Opens the reserve browser; press again to close it |
+| **Menu** | Also toggles the queue |
+| **Back** | Closes an open panel; otherwise asks before backgrounding the app |
 | **Play / Pause** | Toggles playback |
 | **Next** | Skips to the next reservation |
 
 Every button in every list is individually focusable, so the whole app is reachable with a D-pad.
+
+**The controls carry the rest.** Skip, a shortcut into either panel, a **UI** button that hides
+the on-screen badge and Up Next line, and a **Clear** button that empties the queue after
+confirming. The player itself deliberately stays out of the D-pad focus order so `OK` always
+reaches the app; the controls' own buttons are focusable children, so a remote drives them
+normally once they are up.
+
+## What stays on screen
+
+- **`Res. N`**, top-left — how many videos are reserved. It hides when the queue is empty.
+- **`Up Next: "…"`**, top-middle — the next title, persistently rather than as a banner you
+  might miss. Truncated so it does not compete with the video.
+- **Orange dots** in the reserve list — one per time that video is already queued, so a press is
+  never in doubt.
+
+Both on-screen elements hide together via the **UI** button in the controls.
 
 ## How it is built
 

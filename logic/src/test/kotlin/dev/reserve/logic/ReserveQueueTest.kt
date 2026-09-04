@@ -175,6 +175,44 @@ class ReserveQueueTest {
     }
 
     @Test
+    fun `clear empties the queue but leaves what is playing alone`() {
+        val queue = ReserveQueue()
+        queue.reserve(video(1))
+        queue.advance()
+        queue.reserve(video(2))
+        queue.reserve(video(3))
+
+        queue.clear()
+
+        assertTrue(queue.isEmpty())
+        // Clearing the queue must not stop the song someone is mid-way through.
+        assertEquals(1L, queue.nowPlaying?.video?.id)
+    }
+
+    @Test
+    fun `countOf reports how many times a video is queued, for the reserved dots`() {
+        val queue = ReserveQueue()
+        val encore = video(7)
+        queue.reserve(encore)
+        queue.reserve(video(8))
+        queue.reserve(encore)
+        queue.reserve(encore)
+
+        assertEquals(3, queue.countOf(7L))
+        assertEquals(1, queue.countOf(8L))
+        assertEquals(0, queue.countOf(999L))
+    }
+
+    @Test
+    fun `countOf ignores what is playing — the dots mean still to come`() {
+        val queue = ReserveQueue()
+        queue.reserve(video(5))
+        queue.advance()
+
+        assertEquals(0, queue.countOf(5L))
+    }
+
+    @Test
     fun `reservations is a snapshot that later mutation does not alter`() {
         val queue = ReserveQueue()
         queue.reserve(video(1))
