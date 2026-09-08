@@ -96,6 +96,7 @@ class MainActivity : AppCompatActivity() {
         binding.searchInput.doOnTextChanged { _, _, _, _ -> applyFilter() }
         binding.statusAction.setOnClickListener { onStatusAction() }
 
+        sizePanels()
         wireControls()
 
         // When the controls hide, focus may still sit on one of their buttons — now invisible.
@@ -127,6 +128,25 @@ class MainActivity : AppCompatActivity() {
             viewModel.load()
         }
         render()
+    }
+
+    /**
+     * Gives the side sheets a real width.
+     *
+     * They are direct children of a `FrameLayout`, which has no weights — so the `0dp` width that
+     * means "share the space" in a LinearLayout or ConstraintLayout means literally ZERO PIXELS
+     * here. Both panels opened correctly and were invisible, which is exactly what "the browse
+     * feature no longer works" looked like from the outside.
+     *
+     * The XML keeps `match_parent` so that if this ever fails to run the panel is full-screen and
+     * usable rather than absent — a visible failure beats an invisible one.
+     */
+    private fun sizePanels() {
+        val percent = resources.getInteger(R.integer.panel_width_percent)
+        val width = resources.displayMetrics.widthPixels * percent / 100
+        listOf(binding.queuePanel, binding.browserPanel).forEach { panel ->
+            panel.layoutParams = panel.layoutParams.also { it.width = width }
+        }
     }
 
     /** The controls live in `controls.xml`; these are the buttons that act on the QUEUE. */

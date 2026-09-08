@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      How much of the width a side sheet takes. Portrait phones get most of the screen because a
+      third of a narrow screen is too cramped to read a title in; landscape and TV get the third
+      from the mockup, which leaves the video visible behind.
+    -->
+    <integer name="panel_width_percent">85</integer>
+</resources>

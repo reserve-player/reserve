@@ -111,6 +111,36 @@ class RemoteControlTest {
      * broke first time round: gating LEFT/RIGHT on "no panel is open" let the panel open and then
      * left no way to close it with the key that opened it.
      */
+    /**
+     * The test that was missing, and the reason a completely dead browse button shipped past 118
+     * green tests.
+     *
+     * Every panel test asserted `visibility == VISIBLE` — which passes perfectly on a view that
+     * is ZERO PIXELS WIDE. The panels are children of a FrameLayout, where the `0dp` width that
+     * means "share the space" elsewhere means exactly nothing, so they opened and could not be
+     * seen. Visibility is not the same as being on screen; assert the width too.
+     */
+    @Test
+    fun `an opened panel has a real width, not just VISIBLE`() {
+        val controller = launch()
+
+        controller.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        val browser = controller.get().findViewById<View>(R.id.browserPanel)
+        assertEquals(View.VISIBLE, browser.visibility)
+        assertTrue(
+            "a VISIBLE panel with no width is invisible to the user",
+            browser.layoutParams.width > 0,
+        )
+
+        controller.press(KeyEvent.KEYCODE_DPAD_RIGHT)
+        controller.press(KeyEvent.KEYCODE_DPAD_LEFT)
+        val queue = controller.get().findViewById<View>(R.id.queuePanel)
+        assertEquals(View.VISIBLE, queue.visibility)
+        assertTrue("same for the queue sheet", queue.layoutParams.width > 0)
+
+        controller.destroy()
+    }
+
     @Test
     fun `left opens the queue and left again closes it`() {
         val controller = launch()

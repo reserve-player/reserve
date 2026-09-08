@@ -66,7 +66,7 @@
     <!-- Queue: a third of the screen, from the left. LEFT on the remote, or swipe from the edge. -->
     <LinearLayout
         android:id="@+id/queuePanel"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="start"
         android:background="@color/panel_background"
@@ -107,7 +107,7 @@
     <!-- Reserve: a third of the screen, from the right. RIGHT on the remote, or swipe. -->
     <LinearLayout
         android:id="@+id/browserPanel"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:layout_gravity="end"
         android:background="@color/panel_background"
