@@ -20,11 +20,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      # packages is set explicitly because the action's DEFAULT is "tools platform-tools", and
+      # Google has withdrawn the obsolete "tools" package from the SDK repository - sdkmanager
+      # now exits 1 with "Failed to find package 'tools'" and the whole build dies before it
+      # reaches a line of this project's code. Naming what we need also folds the old separate
+      # install step in here, so there is one list of SDK packages rather than two.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android platform
-        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
