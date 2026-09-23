@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One queued row. Every button is individually focusable so a remote can reach them. -->
+<!--
+  One queued row: a number, a title and a running time. Nothing else.
+
+  It carried Play next / Up / Down / Remove buttons until OP asked for "literally just a
+  non-interactive list", and those buttons were also the bug that made every row read BLANK: a
+  horizontal LinearLayout measures its wrap_content children first and gives the weighted one
+  only the leftovers, so once the four of them outgrew a third-of-a-screen panel the title
+  column was allotted zero pixels. With them gone the title has the row to itself.
+
+  focusable stays true and clickable stays false on purpose: focus is the only way a D-pad can
+  scroll a long queue, and the row has nothing to answer a press with.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@drawable/row_focus"
+    android:clickable="false"
     android:focusable="true"
     android:gravity="center_vertical"
     android:minHeight="56dp"
@@ -43,44 +55,4 @@
             android:textColor="@color/text_secondary"
             android:textSize="13sp" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/reservationPlayNext"
-        style="?android:attr/borderlessButtonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_play_next"
-        android:minWidth="48dp"
-        android:text="@string/action_play_next"
-        android:textColor="@color/accent" />
-
-    <Button
-        android:id="@+id/reservationUp"
-        style="?android:attr/borderlessButtonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_up"
-        android:minWidth="48dp"
-        android:text="@string/action_up"
-        android:textColor="@color/text_primary" />
-
-    <Button
-        android:id="@+id/reservationDown"
-        style="?android:attr/borderlessButtonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_down"
-        android:minWidth="48dp"
-        android:text="@string/action_down"
-        android:textColor="@color/text_primary" />
-
-    <Button
-        android:id="@+id/reservationCancel"
-        style="?android:attr/borderlessButtonStyle"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:contentDescription="@string/action_cancel"
-        android:minWidth="48dp"
-        android:text="@string/action_cancel"
-        android:textColor="@color/accent" />
 </LinearLayout>

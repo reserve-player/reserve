@@ -26,11 +26,17 @@ import dev.reserve.logic.VideoSearch
  * The sheets are overlays rather than separate screens precisely because the point of the app is
  * that browsing and reserving never interrupt whatever is on screen.
  *
- * **The one rule for keys**, which has caused a bug in each of the last two rounds: this activity
- * handles a key ONLY while the transport controls are hidden. `OK` shows the controls; the
- * controls then own the keys until they hide again. `PlayerView` stays non-focusable so keys reach
- * [onKeyDown] at all, and the controls' own buttons are focusable CHILDREN, so a remote can still
- * drive them — the parent's flag never blocked that.
+ * **The one rule for keys**, which has caused a bug in each of the last three rounds: this
+ * activity handles a key ONLY while the transport controls are hidden. `OK` shows the controls;
+ * the controls then own the keys until they hide again. `PlayerView` stays non-focusable so keys
+ * reach [onKeyDown] at all, and the controls' own buttons are focusable CHILDREN, so a remote can
+ * still drive them — the parent's flag never blocked that.
+ *
+ * The corollary, and the round-three bug: because the controls own the keys, nothing may put them
+ * up unasked. Media3 does that by default whenever the player is idle, which is exactly when a
+ * video starts — so they appeared over an open reserve panel and swallowed the D-pad. Auto-show
+ * is off, opening a panel takes them down, and `Back` takes them down before it does anything
+ * else.
  */
 @UnstableApi
 class MainActivity : AppCompatActivity() {
@@ -73,6 +79,16 @@ class MainActivity : AppCompatActivity() {
         // A karaoke session is long stretches of nobody touching the device.
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
+        // Media3 pops the controls up by itself whenever the player is idle or paused. On a TV
+        // that stole focus the moment the first video started — the reserve panel was open, and
+        // DOWN went to the seek bar instead of the next search result. OK and a tap are now the
+        // only ways the controls appear, which is the only behaviour a user can predict.
+        //
+        // Set BEFORE the player is attached: setPlayer() itself asks whether to auto-show, so
+        // doing this afterwards would let one slip up before the visibility listener even exists
+        // to notice — controls on screen that the activity believed were hidden.
+        binding.playerView.setControllerAutoShow(false)
+
         sink = ExoVideoSink(
             context = this,
             onEnded = { coordinator.onItemEnded() },
@@ -81,12 +97,7 @@ class MainActivity : AppCompatActivity() {
         binding.playerView.player = sink.player
         coordinator = PlaybackCoordinator(viewModel.queue, sink, ::onQueueChanged)
 
-        queueAdapter = ReservationListAdapter(
-            onCancel = { changeQueue { viewModel.queue.cancel(it) } },
-            onMoveUp = { changeQueue { viewModel.queue.moveUp(it) } },
-            onMoveDown = { changeQueue { viewModel.queue.moveDown(it) } },
-            onPlayNext = { changeQueue { viewModel.queue.bumpToNext(it) } },
-        )
+        queueAdapter = ReservationListAdapter()
 
         binding.libraryList.layoutManager = LinearLayoutManager(this)
         binding.libraryList.adapter = libraryAdapter
@@ -111,6 +122,10 @@ class MainActivity : AppCompatActivity() {
         onBackPressedDispatcher.addCallback(this) {
             when {
                 panel != Panel.NONE -> closePanel()
+                // Back dismisses whatever is on top of the video before it offers to leave. On a
+                // TV the controls could otherwise only be got rid of by waiting out their timeout,
+                // because there is no screen to tap.
+                controlsShowing -> binding.playerView.hideController()
                 // Back must not end a running session: finishing releases the player AND clears
                 // the ViewModel, which is how the reserved queue was being lost.
                 isSessionLive() -> confirmExit()
@@ -172,15 +187,12 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun changeQueue(mutate: () -> Unit) {
-        mutate()
-        onQueueChanged()
-    }
-
     private fun onQueueChanged() {
         viewModel.rememberPendingReservations()
         queueAdapter.submit(viewModel.queue.reservations)
-        applyFilter()
+        // Only the dots moved. Re-running the search and rebuilding the library here is what
+        // threw away the row the user was standing on and dropped focus into the search box.
+        libraryAdapter.updateCounts(viewModel.queue.reservedCounts())
         render()
     }
 
@@ -204,7 +216,8 @@ class MainActivity : AppCompatActivity() {
             .setMessage(getString(R.string.confirm_clear_message, count))
             .setNegativeButton(R.string.action_cancel_dialog, null)
             .setPositiveButton(R.string.confirm_clear_yes) { _, _ ->
-                changeQueue { viewModel.queue.clear() }
+                viewModel.queue.clear()
+                onQueueChanged()
             }
             .show()
     }
@@ -222,6 +235,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun showPanel(target: Panel) {
         panel = target
+        // The controls own the keys while they are up, so they have to come down or the panel
+        // that just opened cannot be driven — the remote would still be on the seek bar.
+        binding.playerView.hideController()
         render()
         // Focus the list, not the search box: on a TV, focusing the field pops the keyboard over
         // the video before the user has asked to type anything.
@@ -275,7 +291,7 @@ class MainActivity : AppCompatActivity() {
         val query = binding.searchInput.text?.toString().orEmpty()
         val results = VideoSearch.search(viewModel.library.value.orEmpty(), query)
         // Counted once per submit rather than per row bind, so a long library stays cheap.
-        libraryAdapter.submit(results, results.associate { it.id to viewModel.queue.countOf(it.id) })
+        libraryAdapter.submit(results, viewModel.queue.reservedCounts())
         binding.browserEmpty.visibility = visibleIf(results.isEmpty())
     }
 

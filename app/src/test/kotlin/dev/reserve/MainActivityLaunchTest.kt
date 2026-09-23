@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.TextView
 import androidx.lifecycle.ViewModelProvider
 import androidx.media3.ui.PlayerView
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import dev.reserve.logic.VideoItem
 import org.junit.Assert.assertEquals
@@ -114,6 +115,60 @@ class MainActivityLaunchTest {
         controller.get().findViewById<View>(R.id.controlSkip).performClick()
 
         assertEquals("skip must promote the next reservation", 2L, queue.nowPlaying?.video?.id)
+
+        controller.destroy()
+    }
+
+    /**
+     * OP: "right after reserving another video, the focus switches to the text box."
+     *
+     * Reserving re-ran the search and called notifyDataSetChanged on the library, which throws
+     * away the row the remote was standing on; focus then falls out of the list and lands on the
+     * search field, so queueing a run of videos meant walking back down the list every time. A
+     * queue change only moves the reserved dots, so the rows must survive it untouched.
+     */
+    @Test
+    fun `a queue change does not rebuild the library list under the user's focus`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val queue = ViewModelProvider(activity)[LibraryViewModel::class.java].queue
+        queue.reserve(video(1L))
+        queue.advance()
+        queue.reserve(video(2L))
+
+        var rebuilds = 0
+        activity.findViewById<RecyclerView>(R.id.libraryList).adapter!!
+            .registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+                override fun onChanged() {
+                    rebuilds++
+                }
+            })
+
+        activity.findViewById<View>(R.id.controlSkip).performClick()
+
+        assertEquals(
+            "a full rebuild throws away the focused row, which is how focus reached the search box",
+            0,
+            rebuilds,
+        )
+
+        controller.destroy()
+    }
+
+    /** The coming-up list is read-only now, so it must still be scrollable by D-pad. */
+    @Test
+    fun `the coming-up list is wired up and reachable`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        val queue = ViewModelProvider(activity)[LibraryViewModel::class.java].queue
+        queue.reserve(video(1L))
+        queue.reserve(video(2L))
+        activity.findViewById<View>(R.id.controlQueue).performClick()
+
+        val list = activity.findViewById<RecyclerView>(R.id.queueList)
+
+        assertEquals("both reservations must be listed", 2, list.adapter?.itemCount)
+        assertEquals(View.GONE, activity.findViewById<View>(R.id.queueEmpty).visibility)
 
         controller.destroy()
     }

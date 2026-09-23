@@ -25,7 +25,7 @@
         <ImageButton
             android:id="@id/exo_rew"
             style="@style/ReserveControlButton"
-            android:contentDescription="@string/action_up"
+            android:contentDescription="@string/action_rewind"
             android:src="@drawable/ic_rewind" />
 
         <ImageButton
@@ -38,7 +38,7 @@
         <ImageButton
             android:id="@id/exo_ffwd"
             style="@style/ReserveControlButton"
-            android:contentDescription="@string/action_down"
+            android:contentDescription="@string/action_forward"
             android:src="@drawable/ic_forward" />
 
         <!-- Ours, not Media3's: advances the QUEUE, which the player knows nothing about. -->

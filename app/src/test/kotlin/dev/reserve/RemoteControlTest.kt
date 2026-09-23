@@ -212,6 +212,56 @@ class RemoteControlTest {
         controller.destroy()
     }
 
+    /**
+     * OP: "the only way to hide the playback controls is to wait for it to hide itself" — on a
+     * phone a tap dismisses them, on a TV there is nothing to tap, so Back has to do it.
+     *
+     * Asserted through key ownership rather than a visibility flag, for the reason the class
+     * comment gives: whoever is claiming OK is the one that currently has the controls.
+     */
+    @Test
+    fun `back takes the controls down before it offers to leave`() {
+        val controller = launch()
+        controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
+        assertFalse(
+            "the controls own the keys while they are up",
+            controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+
+        controller.get().onBackPressedDispatcher.onBackPressed()
+
+        assertTrue(
+            "Back must dismiss the controls — a TV user has no way to tap them away",
+            controller.press(KeyEvent.KEYCODE_DPAD_CENTER),
+        )
+        assertFalse("and it must not leave the app on the way", controller.get().isFinishing)
+
+        controller.destroy()
+    }
+
+    /**
+     * The focus theft OP hit on a fresh start: the controls appeared over the reserve panel and
+     * DOWN went to the seek bar instead of the next search result. Whatever summons them, they
+     * have to come down when a panel opens or they keep the keys.
+     */
+    @Test
+    fun `opening a panel takes the controls off screen`() {
+        val controller = launch()
+        controller.press(KeyEvent.KEYCODE_DPAD_CENTER)
+
+        controller.get().findViewById<View>(R.id.controlQueue).performClick()
+
+        assertEquals(View.VISIBLE, controller.visibilityOf(R.id.queuePanel))
+        assertTrue(
+            "LEFT is only ours while the controls are hidden, so a false here means they are " +
+                "still sitting on top of the panel",
+            controller.press(KeyEvent.KEYCODE_DPAD_LEFT),
+        )
+        assertEquals(View.GONE, controller.visibilityOf(R.id.queuePanel))
+
+        controller.destroy()
+    }
+
     @Test
     fun `back closes an open panel instead of quitting mid-session`() {
         val controller = launch()

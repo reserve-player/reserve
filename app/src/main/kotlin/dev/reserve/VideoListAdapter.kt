@@ -29,6 +29,19 @@ class VideoListAdapter(
         notifyDataSetChanged()
     }
 
+    /**
+     * Reserving changes the dots and nothing else, so the rows are updated IN PLACE.
+     *
+     * Going through submit() here meant a full rebind on every reserve, which threw away the row
+     * the remote was standing on — focus then fell out of the list and landed in the search box,
+     * so queueing a run of videos meant walking back down the list each time. A payload update
+     * reuses the same view, so the focus stays exactly where the user left it.
+     */
+    fun updateCounts(counts: Map<Long, Int>) {
+        reservedCounts = counts
+        notifyItemRangeChanged(0, items.size, COUNTS_CHANGED)
+    }
+
     override fun getItemCount(): Int = items.size
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder =
@@ -37,6 +50,15 @@ class VideoListAdapter(
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val item = items[position]
         holder.bind(item, reservedCounts[item.id] ?: 0, onReserve)
+    }
+
+    override fun onBindViewHolder(holder: ViewHolder, position: Int, payloads: List<Any>) {
+        if (!payloads.contains(COUNTS_CHANGED)) {
+            super.onBindViewHolder(holder, position, payloads)
+            return
+        }
+        val item = items[position]
+        holder.rebindDots(reservedCounts[item.id] ?: 0)
     }
 
     class ViewHolder(
@@ -51,6 +73,9 @@ class VideoListAdapter(
             bindDots(reservedCount)
             binding.root.setOnClickListener { onReserve(item) }
         }
+
+        /** The dots only, for an in-place update that must not disturb the row's focus. */
+        fun rebindDots(reservedCount: Int) = bindDots(reservedCount)
 
         /**
          * One dot per reservation, rebuilt each bind because a recycled row carries the previous
@@ -71,5 +96,10 @@ class VideoListAdapter(
                 row.addView(dot, params)
             }
         }
+    }
+
+    companion object {
+        /** Marks a rebind as "the reserved dots moved, nothing else did". */
+        const val COUNTS_CHANGED = "counts"
     }
 }

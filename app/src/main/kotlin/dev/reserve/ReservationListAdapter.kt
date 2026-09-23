@@ -8,17 +8,19 @@ import dev.reserve.databinding.ItemReservationBinding
 import dev.reserve.logic.DurationFormat
 import dev.reserve.logic.Reservation
 
-/** The "coming up" list, with the controls to reorder or drop a reservation. */
-class ReservationListAdapter(
-    private val onCancel: (Long) -> Unit,
-    private val onMoveUp: (Long) -> Unit,
-    private val onMoveDown: (Long) -> Unit,
-    private val onPlayNext: (Long) -> Unit,
-) : RecyclerView.Adapter<ReservationListAdapter.ViewHolder>() {
+/**
+ * The "coming up" list: a read-only running order, the way a karaoke machine shows one.
+ *
+ * It had per-row Play next / Up / Down / Remove buttons; OP asked for them gone because reserves
+ * are always taken in order, and they were crowding the title off the row entirely. Nothing here
+ * mutates the queue any more — skip and clear, both on the transport controls, are the only ways
+ * a queue changes.
+ */
+class ReservationListAdapter : RecyclerView.Adapter<ReservationListAdapter.ViewHolder>() {
 
     private var items: List<Reservation> = emptyList()
 
-    // Reordering shifts positions for every following row, so the whole list rebinds.
+    // Every row carries its position number, so one change renumbers all of them.
     @SuppressLint("NotifyDataSetChanged")
     fun submit(newItems: List<Reservation>) {
         items = newItems
@@ -31,30 +33,19 @@ class ReservationListAdapter(
         ViewHolder(ItemReservationBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: ViewHolder, position: Int) {
-        holder.bind(items[position], position, onCancel, onMoveUp, onMoveDown, onPlayNext)
+        holder.bind(items[position], position)
     }
 
     class ViewHolder(
         private val binding: ItemReservationBinding,
     ) : RecyclerView.ViewHolder(binding.root) {
 
-        fun bind(
-            reservation: Reservation,
-            position: Int,
-            onCancel: (Long) -> Unit,
-            onMoveUp: (Long) -> Unit,
-            onMoveDown: (Long) -> Unit,
-            onPlayNext: (Long) -> Unit,
-        ) {
+        fun bind(reservation: Reservation, position: Int) {
             val context = binding.root.context
             binding.reservationPosition.text =
                 context.getString(R.string.queue_position, position + 1)
             binding.reservationTitle.text = reservation.video.title
             binding.reservationDuration.text = DurationFormat.format(reservation.video.durationMs)
-            binding.reservationPlayNext.setOnClickListener { onPlayNext(reservation.id) }
-            binding.reservationUp.setOnClickListener { onMoveUp(reservation.id) }
-            binding.reservationDown.setOnClickListener { onMoveDown(reservation.id) }
-            binding.reservationCancel.setOnClickListener { onCancel(reservation.id) }
         }
     }
 }

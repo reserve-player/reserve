@@ -18,8 +18,8 @@ This is that, for the videos already on your phone or TV box.
 - Plays videos from your device, full screen.
 - Opens a search overlay **over** the playing video — playback keeps running while you browse.
 - Reserving a video queues it; the queue plays out automatically, one video after another.
-- A "coming up" panel lets you remove a reservation, move it up or down, or bump it straight to
-  the front.
+- A "coming up" panel shows the running order as a plain numbered list. Reserves are taken in
+  order, the way a karaoke machine does it — there is nothing in there to press by mistake.
 - The same video can be reserved twice — each reservation is its own entry, like a real karaoke
   queue.
 - Reserve while nothing is playing and it just starts.
@@ -70,11 +70,13 @@ builds the same APK, if you would rather let CI do it.
 | **Left** | Opens the "coming up" queue; press again to close it |
 | **Right** | Opens the reserve browser; press again to close it |
 | **Menu** | Also toggles the queue |
-| **Back** | Closes an open panel; otherwise asks before backgrounding the app |
+| **Back** | Closes an open panel, then takes the controls down, and only then asks before backgrounding the app |
 | **Play / Pause** | Toggles playback |
 | **Next** | Skips to the next reservation |
 
-Every button in every list is individually focusable, so the whole app is reachable with a D-pad.
+Every row and button is individually focusable, so the whole app is reachable with a D-pad. The
+controls never appear on their own — `OK` or a screen tap is the only thing that summons them,
+and opening either panel puts them away again, so the panel always has the keys.
 
 **The controls carry the rest.** Skip, a shortcut into either panel, a **UI** button that hides
 the on-screen badge and Up Next line, and a **Clear** button that empties the queue after
@@ -102,9 +104,9 @@ Two modules, split so the interesting logic can be tested without a device:
 | `app/` | The Android shell — the player, the overlays, the device scan, the remote keys. |
 
 The queue is the single source of truth. The player is only ever handed **one** video at a time,
-so nothing has to stay in sync with a player-side playlist while the queue is being reordered
-mid-playback. Auto-advance lives in `logic/` behind a small `VideoSink` interface, which is why
-it can be proven correct with no phone attached.
+so nothing has to stay in sync with a player-side playlist while the queue grows mid-playback.
+Auto-advance lives in `logic/` behind a small `VideoSink` interface, which is why it can be
+proven correct with no phone attached.
 
 ## Tests
 
@@ -119,11 +121,14 @@ contributed zero — a test task that silently runs nothing cannot pass as green
 
 ## Honest limits
 
-- **It has now been run on real hardware — a phone and a Mi Box 3 — and the first pass found
-  three bugs.** Playback could not be restarted after backgrounding, touch users had no controls
-  at all, and videos outside `Movies/` were invisible. All three are fixed, but the point stands:
-  the automated tests here did not catch any of them, so treat "the tests pass" as a floor rather
-  than a guarantee.
+- **It has now been run on real hardware — a phone and a Mi Box 3 — and every pass has found
+  bugs the tests were green on.** Playback could not be restarted after backgrounding; touch
+  users had no controls at all; videos outside `Movies/` were invisible; both side panels opened
+  zero pixels wide; and every row of the coming-up list rendered blank because four buttons
+  squeezed the title column down to nothing. All fixed, and each one now has a test that would
+  have caught it — but the point stands: treat "the tests pass" as a floor rather than a
+  guarantee. The recurring failure mode here is a view that is present and correct in memory
+  while being invisible on screen, so the newer tests measure widths rather than reading fields.
 - Everything is still verified by unit tests, Robolectric and a CI build rather than by a
   device sitting on a desk. That covers this app's own code; it does not cover ExoPlayer painting
   frames on your particular TV, or whether the focus highlights read from a sofa.

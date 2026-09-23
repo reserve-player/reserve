@@ -35,23 +35,6 @@ class ReserveQueue {
         return reservation
     }
 
-    /** Moves an existing reservation to the front of the queue. */
-    fun bumpToNext(reservationId: Long): Boolean {
-        val index = indexOf(reservationId)
-        if (index <= 0) return false
-        pending.add(0, pending.removeAt(index))
-        return true
-    }
-
-    /** Drops a reservation. Returns false when the id is not queued. */
-    fun cancel(reservationId: Long): Boolean = pending.removeAll { it.id == reservationId }
-
-    /** Moves a reservation one place earlier. A no-op at the head. */
-    fun moveUp(reservationId: Long): Boolean = swap(indexOf(reservationId), -1)
-
-    /** Moves a reservation one place later. A no-op at the tail. */
-    fun moveDown(reservationId: Long): Boolean = swap(indexOf(reservationId), 1)
-
     /**
      * Promotes the head of the queue to [nowPlaying] and returns it, or null when the queue
      * is empty — in which case nothing is playing any more.
@@ -71,18 +54,12 @@ class ReserveQueue {
         pending.clear()
     }
 
-    /** How many times [videoId] appears in the queue — one dot per reservation in the browser. */
-    fun countOf(videoId: Long): Int = pending.count { it.video.id == videoId }
-
-    private fun indexOf(reservationId: Long): Int = pending.indexOfFirst { it.id == reservationId }
-
-    private fun swap(index: Int, delta: Int): Boolean {
-        if (index < 0) return false
-        val target = index + delta
-        if (target < 0 || target >= pending.size) return false
-        val moved = pending[index]
-        pending[index] = pending[target]
-        pending[target] = moved
-        return true
-    }
+    /**
+     * How many times each queued video appears, keyed by video id — one dot per reservation in
+     * the browser.
+     *
+     * Counted in one pass over the queue rather than per library row: a browser showing 400
+     * videos was previously asking the queue about every one of them on every keystroke.
+     */
+    fun reservedCounts(): Map<Long, Int> = pending.groupingBy { it.video.id }.eachCount()
 }

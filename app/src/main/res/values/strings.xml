@@ -7,10 +7,8 @@
     <string name="queue_title">Coming up</string>
 
     <string name="action_reserve">Reserve</string>
-    <string name="action_play_next">Play next</string>
-    <string name="action_cancel">Remove</string>
-    <string name="action_up">Up</string>
-    <string name="action_down">Down</string>
+    <string name="action_rewind">Rewind</string>
+    <string name="action_forward">Fast forward</string>
     <string name="action_grant">Allow access to videos</string>
     <string name="action_browse">Browse videos</string>
     <string name="action_settings">Open settings</string>

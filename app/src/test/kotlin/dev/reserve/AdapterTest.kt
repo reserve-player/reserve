@@ -8,10 +8,11 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ApplicationProvider
 import dev.reserve.logic.Reservation
-import dev.reserve.logic.ReserveQueue
 import dev.reserve.logic.VideoItem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -93,7 +94,7 @@ class AdapterTest {
 
     @Test
     fun `a queue row is numbered from one and shows the title`() {
-        val adapter = ReservationListAdapter({ }, { }, { }, { })
+        val adapter = ReservationListAdapter()
         adapter.submit(
             listOf(
                 Reservation(100L, video(id = 1L, title = "First")),
@@ -108,56 +109,85 @@ class AdapterTest {
         assertEquals("Second", holder.itemView.text(R.id.reservationTitle))
     }
 
+    /**
+     * OP's bug: every row in the coming-up list rendered blank on both his phone and his Mi Box.
+     *
+     * The row is a horizontal LinearLayout. A LinearLayout measures its `wrap_content` children
+     * FIRST and hands the weighted one only what is LEFT OVER — so once the row's buttons
+     * outgrew a third-of-a-screen panel, the title column was allotted exactly ZERO pixels.
+     * `reservationTitle.text` was correct the entire time, which is precisely why the test above
+     * passed while the feature was visibly broken.
+     *
+     * So this one lays the row out at the width it really gets on a TV and asserts the title is
+     * ON SCREEN. Half the row is the bar: a title that cannot show a few words is a blank row.
+     */
     @Test
-    fun `the queue row buttons report the reservation they belong to`() {
-        var cancelled: Long? = null
-        var movedUp: Long? = null
-        var movedDown: Long? = null
-        var playNext: Long? = null
-        val adapter = ReservationListAdapter(
-            onCancel = { cancelled = it },
-            onMoveUp = { movedUp = it },
-            onMoveDown = { movedDown = it },
-            onPlayNext = { playNext = it },
-        )
-        adapter.submit(listOf(Reservation(77L, video())))
+    fun `a queue row's title is laid out on screen, not merely set`() {
+        val adapter = ReservationListAdapter()
+        adapter.submit(listOf(Reservation(1L, video(title = "Bohemian Rhapsody"))))
 
         val holder = adapter.onCreateViewHolder(parent, 0)
         adapter.onBindViewHolder(holder, 0)
-        holder.itemView.findViewById<View>(R.id.reservationUp).performClick()
-        holder.itemView.findViewById<View>(R.id.reservationDown).performClick()
-        holder.itemView.findViewById<View>(R.id.reservationCancel).performClick()
-        holder.itemView.findViewById<View>(R.id.reservationPlayNext).performClick()
+        val row = holder.itemView.layoutAt(tvPanelRowWidthPx())
 
-        assertEquals(77L, movedUp)
-        assertEquals(77L, movedDown)
-        assertEquals(77L, cancelled)
-        assertEquals(77L, playNext)
+        val title = row.findViewById<TextView>(R.id.reservationTitle)
+        assertTrue(
+            "the title was set but laid out ${title.width}px wide inside a ${row.width}px row," +
+                " which is the blank coming-up list",
+            title.width >= row.width / 2,
+        )
+    }
+
+    /** The same row on a phone, where the panel is wider but the title still has to fit. */
+    @Test
+    fun `a queue row keeps its position number and duration beside the title`() {
+        val adapter = ReservationListAdapter()
+        adapter.submit(listOf(Reservation(1L, video(title = "Bohemian Rhapsody"))))
+
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+        val row = holder.itemView.layoutAt(tvPanelRowWidthPx())
+
+        assertTrue(row.findViewById<TextView>(R.id.reservationPosition).width > 0)
+        assertTrue(row.findViewById<TextView>(R.id.reservationDuration).width > 0)
+        assertEquals("5:55", row.text(R.id.reservationDuration))
     }
 
     /**
-     * The queue owns the ordering, so this is the seam where a wrong wiring would hide: the
-     * button could fire and still call the wrong queue method. Pressing it on the third row must
-     * put exactly that reservation at the front.
+     * OP asked for the coming-up list to be "literally just a non-interactive list". A row that
+     * still answers a click is one stray remote press away from reordering somebody's party.
      */
     @Test
-    fun `play next on a queued row moves that video to the front`() {
-        val queue = ReserveQueue()
-        queue.reserve(video(id = 1L, title = "Playing"))
-        queue.advance()
-        queue.reserve(video(id = 2L, title = "First"))
-        queue.reserve(video(id = 3L, title = "Second"))
-        val third = queue.reserve(video(id = 4L, title = "Third"))
+    fun `a queue row does nothing when it is pressed`() {
+        val adapter = ReservationListAdapter()
+        adapter.submit(listOf(Reservation(1L, video())))
 
-        val adapter = ReservationListAdapter({ }, { }, { }, onPlayNext = { queue.bumpToNext(it) })
-        adapter.submit(queue.reservations)
         val holder = adapter.onCreateViewHolder(parent, 0)
-        adapter.onBindViewHolder(holder, 2)
-        holder.itemView.findViewById<View>(R.id.reservationPlayNext).performClick()
+        adapter.onBindViewHolder(holder, 0)
 
-        assertEquals(third.id, queue.reservations.first().id)
-        assertEquals(listOf("Third", "First", "Second"), queue.reservations.map { it.video.title })
-        assertEquals("Playing", queue.nowPlaying?.video?.title)
+        assertFalse("a plain list row must not be clickable", holder.itemView.isClickable)
+        assertTrue(
+            "but it must still take D-pad focus, or a long queue cannot be scrolled on a TV",
+            holder.itemView.isFocusable,
+        )
+    }
+
+    /**
+     * A third of a 960dp-wide TV screen less the panel's own 20dp padding either side — the width
+     * a queued row actually gets on OP's Mi Box.
+     */
+    private fun tvPanelRowWidthPx(): Int {
+        val density = context.resources.displayMetrics.density
+        return (((960 * 34 / 100) - 40) * density).toInt()
+    }
+
+    private fun View.layoutAt(widthPx: Int): View {
+        measure(
+            View.MeasureSpec.makeMeasureSpec(widthPx, View.MeasureSpec.EXACTLY),
+            View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
+        )
+        layout(0, 0, measuredWidth, measuredHeight)
+        return this
     }
 
     // ---- the reserved dots ----------------------------------------------------------------
@@ -211,6 +241,42 @@ class AdapterTest {
         adapter.onBindViewHolder(holder, 1)
 
         assertEquals("the unreserved video must show a clean row", 0, dotsIn(holder))
+    }
+
+    /**
+     * Reserving changes nothing but the dot counts, so it must not replace the rows.
+     *
+     * Rebuilding the list tears down whichever row the remote was sitting on, and focus then
+     * falls out of the list entirely — OP hit that as "the focus switches to the text box" after
+     * every single reserve. Updating through the payload keeps the same view, and the same focus.
+     */
+    @Test
+    fun `updating the counts redraws the dots on the row that is already there`() {
+        val adapter = VideoListAdapter { }
+        adapter.submit(listOf(video(id = 1L)), counts = emptyMap())
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+        assertEquals(0, dotsIn(holder))
+
+        adapter.updateCounts(mapOf(1L to 2))
+        adapter.onBindViewHolder(holder, 0, listOf(VideoListAdapter.COUNTS_CHANGED))
+
+        assertEquals("the second reserve must show as a second dot", 2, dotsIn(holder))
+    }
+
+    /** A payload rebind touches the dots only — the rest of the row is already correct. */
+    @Test
+    fun `a payload rebind leaves the title alone`() {
+        val adapter = VideoListAdapter { }
+        adapter.submit(listOf(video(id = 1L, title = "Bohemian Rhapsody")))
+        val holder = adapter.onCreateViewHolder(parent, 0)
+        adapter.onBindViewHolder(holder, 0)
+
+        adapter.updateCounts(mapOf(1L to 1))
+        adapter.onBindViewHolder(holder, 0, listOf(VideoListAdapter.COUNTS_CHANGED))
+
+        assertEquals("Bohemian Rhapsody", holder.itemView.text(R.id.videoTitle))
+        assertEquals(1, dotsIn(holder))
     }
 
     private fun View.text(id: Int): String = findViewById<TextView>(id).text.toString()
