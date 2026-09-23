@@ -114,7 +114,7 @@ proven correct with no phone attached.
 gradle :logic:test :app:testDebugUnitTest
 ```
 
-92 tests. The `logic/` suite runs on a plain JVM; the `app/` suite runs under Robolectric and
+120 tests. The `logic/` suite runs on a plain JVM; the `app/` suite runs under Robolectric and
 includes a test that actually starts the activity, so a green build means the app launches rather
 than merely compiling. CI additionally counts the executed test cases and fails if either module
 contributed zero — a test task that silently runs nothing cannot pass as green.
@@ -144,7 +144,7 @@ contributed zero — a test task that silently runs nothing cannot pass as green
 
 This was built end to end in [Omniscio](https://omniscio.com), a desktop app for running and
 coordinating Claude Code sessions. Everything here — reading the original request, the design
-decisions, the code, the 92 tests, the CI pipeline, and this README — came out of a single
+decisions, the code, the 120 tests, the CI pipeline, and this README — came out of a single
 agent-driven run.
 
 Worth stating plainly, since it explains the limits above: no human ever ran this on a phone or a
