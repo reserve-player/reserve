@@ -155,20 +155,51 @@ class MainActivityLaunchTest {
         controller.destroy()
     }
 
-    /** The coming-up list is read-only now, so it must still be scrollable by D-pad. */
+    /**
+     * A queue can arrive without any user action: after a background kill the ViewModel refills
+     * it from saved state on the way back in. The list was only ever submitted from the paths a
+     * user pressed, so the Res badge counted the reservations correctly while the coming-up
+     * panel showed nothing at all. Redrawing it is now part of render(), like everything else.
+     */
     @Test
-    fun `the coming-up list is wired up and reachable`() {
+    fun `the coming-up list shows a queue that arrived without a user action`() {
         val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
         val activity = controller.get()
         val queue = ViewModelProvider(activity)[LibraryViewModel::class.java].queue
         queue.reserve(video(1L))
         queue.reserve(video(2L))
+
         activity.findViewById<View>(R.id.controlQueue).performClick()
 
-        val list = activity.findViewById<RecyclerView>(R.id.queueList)
-
-        assertEquals("both reservations must be listed", 2, list.adapter?.itemCount)
+        assertEquals(
+            "the panel must list what the badge is counting",
+            2,
+            activity.findViewById<RecyclerView>(R.id.queueList).adapter?.itemCount,
+        )
+        assertEquals("Res. 2", activity.findViewById<TextView>(R.id.resBadge).text.toString())
         assertEquals(View.GONE, activity.findViewById<View>(R.id.queueEmpty).visibility)
+
+        controller.destroy()
+    }
+
+    /** Rebinding a list nobody changed would reset the scroll and focus under whoever is reading it. */
+    @Test
+    fun `redrawing without a queue change leaves the coming-up list alone`() {
+        val controller = Robolectric.buildActivity(MainActivity::class.java).setup()
+        val activity = controller.get()
+        ViewModelProvider(activity)[LibraryViewModel::class.java].queue.reserve(video(1L))
+        activity.findViewById<View>(R.id.controlQueue).performClick()
+
+        var rebinds = 0
+        activity.findViewById<RecyclerView>(R.id.queueList).adapter!!
+            .registerAdapterDataObserver(object : RecyclerView.AdapterDataObserver() {
+                override fun onChanged() {
+                    rebinds++
+                }
+            })
+        activity.findViewById<View>(R.id.controlToggleHud).performClick()
+
+        assertEquals("an unrelated redraw must not touch the list", 0, rebinds)
 
         controller.destroy()
     }

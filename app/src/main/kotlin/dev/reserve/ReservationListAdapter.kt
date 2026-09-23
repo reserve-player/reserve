@@ -23,6 +23,10 @@ class ReservationListAdapter : RecyclerView.Adapter<ReservationListAdapter.ViewH
     // Every row carries its position number, so one change renumbers all of them.
     @SuppressLint("NotifyDataSetChanged")
     fun submit(newItems: List<Reservation>) {
+        // render() runs on every redraw, most of which leave the queue alone. Rebinding a list
+        // that has not changed would reset the scroll position and the D-pad focus under
+        // somebody who is reading it.
+        if (newItems == items) return
         items = newItems
         notifyDataSetChanged()
     }

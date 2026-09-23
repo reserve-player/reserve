@@ -115,7 +115,11 @@ class MainActivity : AppCompatActivity() {
         binding.playerView.setControllerVisibilityListener(
             PlayerView.ControllerVisibilityListener { visibility ->
                 controlsShowing = visibility == View.VISIBLE
-                if (!controlsShowing) binding.root.requestFocus()
+                // Only when nothing else wants the focus. The controls also go away BECAUSE a
+                // panel opened, and this callback lands a couple of hundred milliseconds later
+                // when the hide animation ends — long enough to yank focus out of the list the
+                // user had just opened and leave the D-pad doing nothing.
+                if (!controlsShowing && panel == Panel.NONE) binding.root.requestFocus()
             },
         )
 
@@ -125,7 +129,7 @@ class MainActivity : AppCompatActivity() {
                 // Back dismisses whatever is on top of the video before it offers to leave. On a
                 // TV the controls could otherwise only be got rid of by waiting out their timeout,
                 // because there is no screen to tap.
-                controlsShowing -> binding.playerView.hideController()
+                controlsShowing -> hideControls()
                 // Back must not end a running session: finishing releases the player AND clears
                 // the ViewModel, which is how the reserved queue was being lost.
                 isSessionLive() -> confirmExit()
@@ -189,7 +193,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun onQueueChanged() {
         viewModel.rememberPendingReservations()
-        queueAdapter.submit(viewModel.queue.reservations)
         // Only the dots moved. Re-running the search and rebuilding the library here is what
         // threw away the row the user was standing on and dropped focus into the search box.
         libraryAdapter.updateCounts(viewModel.queue.reservedCounts())
@@ -237,12 +240,25 @@ class MainActivity : AppCompatActivity() {
         panel = target
         // The controls own the keys while they are up, so they have to come down or the panel
         // that just opened cannot be driven — the remote would still be on the seek bar.
-        binding.playerView.hideController()
+        hideControls()
         render()
         // Focus the list, not the search box: on a TV, focusing the field pops the keyboard over
         // the video before the user has asked to type anything.
         if (target == Panel.BROWSER) binding.libraryList.requestFocus()
         if (target == Panel.QUEUE) binding.queueList.requestFocus()
+    }
+
+    /**
+     * Takes the controls down and claims the keys back in the same breath.
+     *
+     * `hideController()` ANIMATES, so the visibility callback only lands when that animation
+     * finishes. Waiting for it leaves a window where the controls are on their way out and still
+     * owning every key the user presses, which on a TV reads as a panel that opened and then
+     * ignored the remote.
+     */
+    private fun hideControls() {
+        binding.playerView.hideController()
+        controlsShowing = false
     }
 
     private fun togglePanel(target: Panel) {
@@ -297,6 +313,11 @@ class MainActivity : AppCompatActivity() {
 
     /** Single place that decides what is on screen, so no two paths can disagree. */
     private fun render() {
+        // Submitted here rather than only when the user changes the queue: a queue restored
+        // after a background kill is refilled by the ViewModel, which no user action passes
+        // through. The Res badge counted those reservations correctly while the coming-up panel
+        // sat empty, because only the badge was read from the queue on every render.
+        queueAdapter.submit(viewModel.queue.reservations)
         binding.browserPanel.visibility = visibleIf(panel == Panel.BROWSER)
         binding.queuePanel.visibility = visibleIf(panel == Panel.QUEUE)
         binding.queueEmpty.visibility = visibleIf(viewModel.queue.isEmpty())
