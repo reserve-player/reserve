@@ -55,6 +55,26 @@ jobs:
       - name: Build debug APK
         run: gradle :app:assembleDebug
 
+      # The failure this catches shipped once and cost a tester two installs: the APK verified,
+      # aligned and parsed perfectly, and still would not go on because it carried a DIFFERENT
+      # signing key from the build already on the device. Nothing about the APK looks wrong when
+      # that happens, so the only way to see it is to compare the certificate against the one
+      # this project is supposed to sign with.
+      - name: The APK must carry the project's own signing key
+        run: |
+          expected=54:55:EE:4D:0E:91:A7:18:15:3A:B6:63:52:B8:98:EA:5D:B0:23:CC:7F:FA:4A:70:EE:97:4D:AD:22:68:4C:D5
+          expected=$(echo "$expected" | tr -d ':' | tr '[:upper:]' '[:lower:]')
+          actual=$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs \
+            app/build/outputs/apk/debug/app-debug.apk \
+            | awk '/certificate SHA-256 digest/ {print $NF; exit}')
+          echo "expected: $expected"
+          echo "actual:   $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Signed with the wrong key - this APK cannot install over an existing Reserve. Is reserve.keystore being picked up?"
+            exit 1
+          fi
+          echo "Signing key matches; this APK can update an existing install."
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v5
         with:

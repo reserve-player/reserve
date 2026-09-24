@@ -15,9 +15,36 @@ android {
         versionName = "1.0"
     }
 
+    /**
+     * The key is IN THE REPO on purpose, and that is a deliberate trade.
+     *
+     * Android will not replace an installed app with one signed by a different key. Debug builds
+     * are normally signed with `~/.android/debug.keystore`, which every machine generates for
+     * itself - so the CI runner's APK, a maintainer's APK and yours from source were three
+     * different identities. Shipping one of those over another fails at install time, which is
+     * how a perfectly valid APK came to report "There was a problem parsing the package".
+     *
+     * A committed key therefore proves nothing about WHO built an APK - anyone can sign one.
+     * That is acceptable here precisely because the app has no network permission, no account
+     * and no data worth taking, and the alternative is an app that can never be updated in
+     * place. It is not Play-signed and should not be treated as if it were.
+     */
+    signingConfigs {
+        create("shared") {
+            storeFile = rootProject.file("reserve.keystore")
+            storePassword = "reserve"
+            keyAlias = "reserve"
+            keyPassword = "reserve"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("shared")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("shared")
         }
     }
 

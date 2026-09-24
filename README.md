@@ -40,13 +40,29 @@ This is that, for the videos already on your phone or TV box.
 you to allow installs from unknown sources — that prompt is normal for anything not from the Play
 Store. `minSdk` is 21, so it installs back to Android 5.0.
 
-Two honest things about that file:
+### If you installed a build from before 24 September 2026
 
-- **It is a debug build**, signed with Android's standard debug key (`CN=Android Debug`). It runs
-  exactly like a release build for everyday use, but it is not Play-Store signed, and you cannot
-  upgrade it in place from a differently-signed build later.
+**Uninstall Reserve first, then install the new APK.** Android refuses to replace an installed
+app with one signed by a different key, and the builds up to that date were each signed with
+whatever throwaway debug key the machine that built them happened to generate. A valid APK hitting
+that wall reports **"There was a problem parsing the package"**, which sounds like a corrupt
+download and is not one.
+
+From this build on the key is fixed (see below), so every future APK updates in place normally.
+Uninstalling loses nothing but the app itself — Reserve keeps no data, and the queue never
+survived a quit anyway.
+
+Two honest things about the file:
+
+- **It is a debug build**, signed with this project's own key, which is committed to the repo as
+  [reserve.keystore](reserve.keystore). That is deliberate: it makes CI's APK, a maintainer's APK
+  and the one you build from source all the same identity, so they can replace each other. The
+  flip side is that a key anyone can read proves nothing about who built a given APK. That trade
+  is fine here — the app has no network permission, no account and nothing to steal — but it is
+  not Play-Store signing and should not be mistaken for it.
 - **It is a binary from the internet.** If you would rather not trust one, build your own from
-  this source with the command below — the result is the same app.
+  this source with the command below — the result is the same app, and it will install straight
+  over this one.
 
 ### Building it yourself
 
@@ -127,8 +143,10 @@ contributed zero — a test task that silently runs nothing cannot pass as green
   zero pixels wide; and every row of the coming-up list rendered blank because four buttons
   squeezed the title column down to nothing. All fixed, and each one now has a test that would
   have caught it — but the point stands: treat "the tests pass" as a floor rather than a
-  guarantee. The recurring failure mode here is a view that is present and correct in memory
-  while being invisible on screen, so the newer tests measure widths rather than reading fields.
+  guarantee. The recurring failure mode here is a thing that is present and correct by every
+  measure the code can take of itself while being unusable in the tester's hands, so the newer
+  checks measure widths rather than reading fields, and compare the signing certificate rather
+  than trusting that an APK which verifies will install.
 - Everything is still verified by unit tests, Robolectric and a CI build rather than by a
   device sitting on a desk. That covers this app's own code; it does not cover ExoPlayer painting
   frames on your particular TV, or whether the focus highlights read from a sofa.
